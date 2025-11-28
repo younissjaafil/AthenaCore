@@ -55,7 +55,7 @@ athena-backend/
 ├── .env                           # Environment variables
 ├── .env.development               # Development config
 ├── .env.production                # Production config (template)
-├── docker-compose.yml             # (Future) Docker setup
+├── railway.json                   # Railway deployment config
 └── package.json
 ```
 
@@ -354,14 +354,51 @@ npm run test:e2e
 npm run test:cov
 ```
 
-## 🐳 Docker (Future)
+## 🚂 Deployment (Railway)
 
-```bash
-# Start services
-docker-compose up -d
+This project is configured for deployment on Railway via GitHub integration.
 
-# Stop services
-docker-compose down
+### Setup
+
+1. **Connect to Railway**:
+   - Link your GitHub repository to Railway
+   - Railway will auto-detect the NestJS project
+
+2. **Environment Variables**:
+   - Add all variables from `.env` to Railway's environment settings
+   - Railway provides PostgreSQL and Redis add-ons
+
+3. **Deployment**:
+
+   ```bash
+   # Push to main branch
+   git push origin main
+
+   # Railway will automatically:
+   # - Install dependencies (npm install --legacy-peer-deps)
+   # - Build the project (npm run build)
+   # - Start the server (npm run start:prod)
+   ```
+
+4. **Database Setup**:
+   - Enable pgvector extension:
+     ```sql
+     CREATE EXTENSION IF NOT EXISTS vector;
+     ```
+
+### Railway Configuration (`railway.json`)
+
+```json
+{
+  "build": {
+    "builder": "NIXPACKS",
+    "buildCommand": "npm run build"
+  },
+  "deploy": {
+    "startCommand": "npm run start:prod",
+    "restartPolicyType": "ON_FAILURE"
+  }
+}
 ```
 
 ## 📚 Additional Resources

@@ -1,0 +1,35 @@
+# Development files
+
+.env.development
+.env.local
+
+# Tests
+
+test/
+\*.spec.ts
+coverage/
+
+# Documentation
+
+README.md
+IMPLEMENTATION_SUMMARY.md
+
+# IDE
+
+.vscode/
+.idea/
+
+# Git
+
+.git/
+.gitignore
+
+# Logs
+
+\*.log
+logs/
+
+# OS
+
+.DS_Store
+Thumbs.db
