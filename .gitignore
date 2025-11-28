@@ -52,8 +52,8 @@ README.md
 IMPLEMENTATION_SUMMARY.md
 
 .env.production
-
+.env.backup
 CLERK_SETUP.md
 
- 
+test-infrastructure.ts
 /docs
