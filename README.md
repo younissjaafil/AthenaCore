@@ -175,7 +175,7 @@ Swagger documentation is available at: `http://localhost:3000/docs`
 - **Redis** - Caching layer for search results
 - **Swagger** - API documentation
 - **class-validator** - DTO validation
-- **pdf-parse** - PDF text extraction
+- **pdfjs-dist** - PDF text extraction (production-ready)
 - **mammoth** - DOCX text extraction
 - **tiktoken** - Token counting for embeddings
 
@@ -477,7 +477,11 @@ npm run typeorm migration:revert
 
 ### Phase 4: Payments & Sessions
 
-- [ ] Conversations & chat with RAG-powered responses
+- [] Connect to infrastructure ensue all connected
+- [] Conversations & chat with RAG-powered responses
+- [] Test Here and then Finish For Today
+
+- [Tomorrow Start Here]
 - [ ] Payment gateway integration (Whish)
 - [ ] Subscription management
 - [ ] Entitlement checks

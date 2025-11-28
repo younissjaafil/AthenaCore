@@ -23,10 +23,6 @@ import {
 import { extname } from 'path';
 import * as mammoth from 'mammoth';
 
-// pdf-parse doesn't have proper ES module exports
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const pdfParse = require('pdf-parse');
-
 @Injectable()
 export class DocumentsService {
   private readonly logger = new Logger(DocumentsService.name);
@@ -197,8 +193,30 @@ export class DocumentsService {
     try {
       switch (type) {
         case DocumentType.PDF: {
-          const pdfData = await pdfParse(buffer);
-          return pdfData.text;
+          // Dynamically import pdfjs-dist (ES module)
+          const pdfjsLib = await import('pdfjs-dist');
+
+          // Load PDF document
+          const loadingTask = pdfjsLib.getDocument({
+            data: new Uint8Array(buffer),
+            useSystemFonts: true,
+            standardFontDataUrl: undefined,
+          });
+          const pdf = await loadingTask.promise;
+
+          // Extract text from all pages
+          const textPromises: Promise<string>[] = [];
+          for (let i = 1; i <= pdf.numPages; i++) {
+            textPromises.push(
+              pdf.getPage(i).then(async (page) => {
+                const textContent = await page.getTextContent();
+                return textContent.items.map((item: any) => item.str).join(' ');
+              }),
+            );
+          }
+
+          const texts = await Promise.all(textPromises);
+          return texts.join('\n\n');
         }
 
         case DocumentType.DOCX: {

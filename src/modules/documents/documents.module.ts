@@ -11,6 +11,6 @@ import { S3Module } from '../../infrastructure/storage/s3.module';
   imports: [TypeOrmModule.forFeature([Document]), AgentsModule, S3Module],
   controllers: [DocumentsController],
   providers: [DocumentsService, DocumentsRepository],
-  exports: [DocumentsService],
+  exports: [DocumentsService, DocumentsRepository],
 })
 export class DocumentsModule {}
