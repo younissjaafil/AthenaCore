@@ -1,9 +1,13 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
 // Config
 import { ConfigModule } from './config/config.module';
+
+// Guards
+import { ClerkAuthGuard } from './modules/auth/guards/clerk-auth.guard';
 
 // Infrastructure
 import { DatabaseModule } from './infrastructure/database/database.module';
@@ -55,6 +59,13 @@ import { HealthModule } from './modules/health/health.module';
     HealthModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    // Global authentication guard
+    {
+      provide: APP_GUARD,
+      useClass: ClerkAuthGuard,
+    },
+  ],
 })
 export class AppModule {}

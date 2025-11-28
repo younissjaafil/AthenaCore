@@ -74,4 +74,8 @@ export class EnvironmentVariables {
   @IsString()
   @IsOptional()
   CLERK_PUBLISHABLE_KEY?: string;
+
+  @IsString()
+  @IsOptional()
+  CLERK_WEBHOOK_SECRET?: string;
 }

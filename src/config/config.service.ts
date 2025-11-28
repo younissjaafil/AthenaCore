@@ -95,4 +95,8 @@ export class ConfigService {
   get clerkPublishableKey(): string | undefined {
     return this.configService.get<string>('CLERK_PUBLISHABLE_KEY');
   }
+
+  get clerkWebhookSecret(): string | undefined {
+    return this.configService.get<string>('CLERK_WEBHOOK_SECRET');
+  }
 }
