@@ -46,8 +46,19 @@ A comprehensive NestJS monolith architecture for the Athena v1 AI agent platform
   - OpenAI API (text-embedding-3-small)
   - Qdrant Vector Database
   - Clerk Authentication
-- ⏳ Payments module - Whish payment gateway integration
-- ⏳ Sessions module - Live session booking with creators
+- ✅ Payments module - Whish payment gateway integration
+  - Payment creation and processing
+  - Transaction tracking with external IDs
+  - Entitlement system for agent access control
+  - Webhook callbacks for payment status
+  - Multi-currency support (LBP, USD, AED)
+  - Balance checking and transaction history
+- ✅ Sessions module - Live session booking with creators
+  - Session booking with conflict detection
+  - Video provider integration (Jitsi, Daily)
+  - Status management (pending, confirmed, in-progress, completed)
+  - Automatic video room generation
+  - Session lifecycle tracking
 - ⏳ Notifications module - Email, SMS, push notifications
 - ⏳ Admin module - Administrative operations
 
@@ -274,18 +285,66 @@ Swagger documentation is available at: `http://localhost:3000/docs`
 - Simulated AI responses (OpenAI integration ready)
 - Configurable RAG usage per message
 
-#### 💳 Payments Module
+#### 💳 Payments Module ✅
 
-- Payment gateway integration (Whish/Stripe)
-- Subscription management
-- Transaction tracking
-- Entitlement service: `canAccessAgent(userId, agentId)`
+- **Whish Payment Gateway Integration** - Production-ready payment processing
+- **Transaction Management** - Complete payment lifecycle tracking
+- **Entitlement System** - Agent access control based on payments
+- **Multi-currency Support** - LBP, USD, AED
+- **Webhook Integration** - Automatic payment status updates
+- **Balance Checking** - Real-time account balance from Whish
 
-#### 📞 Sessions Module
+**Features:**
 
-- Live session scheduling (student ↔ creator)
-- Video provider integration (Jitsi/Daily/Zoom)
-- Session status tracking
+- Create payments for agent access with auto-generated external IDs
+- Track payment status (pending, success, failed)
+- Grant lifetime entitlements upon successful payment
+- Check user access to premium agents
+- Process webhook callbacks for payment events
+- List user transactions and active entitlements
+- Secure payment URLs with Whish collect system
+
+**Technical Implementation:**
+
+- WhishService - HTTP client wrapper for Whish API (balance, payment, status endpoints)
+- TransactionsRepository - Payment persistence with external ID tracking
+- EntitlementsRepository - Access control with expiration support
+- PaymentsService - Business logic for payments and entitlements
+- PaymentsController - 8 REST endpoints with authentication guards
+- Support for custom callback/redirect URLs
+- Metadata storage for payment context
+
+#### 📞 Sessions Module ✅
+
+- **Live Session Booking** - Schedule 1-on-1 sessions with creators
+- **Video Integration** - Support for Jitsi and Daily video providers
+- **Conflict Detection** - Automatic time slot conflict checking
+- **Status Management** - Complete session lifecycle tracking
+- **Room Generation** - Automatic video room URL creation
+
+**Features:**
+
+- Book sessions with creators at specific times
+- Validate scheduled times and detect conflicts
+- Support for paid and free sessions
+- Automatic video room generation on confirmation
+- Track session status (pending → confirmed → in-progress → completed)
+- Cancel sessions with reason tracking
+- Student and creator notes
+- Session reminders (query helper included)
+
+**Video Providers:**
+
+- **Jitsi** - Free, open-source video conferencing (default)
+- **Daily.co** - Enterprise video API (integration ready)
+
+**Technical Implementation:**
+
+- SessionsRepository - CRUD with conflict detection queries
+- SessionsService - Booking logic, video room generation, status management
+- SessionsController - 9 REST endpoints with authentication
+- Support for session duration, pricing, and notes
+- Metadata storage for cancellations and rescheduling
 
 #### 🔔 Notifications Module
 
@@ -480,11 +539,33 @@ npm run typeorm migration:revert
 - `POST /api/conversations/:id/messages` - Send message and get RAG-powered response ✅
 - `PATCH /api/conversations/:id/archive` - Archive conversation ✅
 
+**Payments:**
+
+- `GET /api/payments/balance` - Get Whish account balance ✅
+- `POST /api/payments/agent/:agentId` - Create payment for agent access ✅
+- `GET /api/payments/transactions` - List user's transactions ✅
+- `GET /api/payments/transactions/:id/status` - Check payment status ✅
+- `GET /api/payments/entitlements` - List user's active entitlements ✅
+- `GET /api/payments/agent/:agentId/access` - Check if user can access agent ✅
+- `POST /api/payments/callback/success` - Payment success webhook (public) ✅
+- `POST /api/payments/callback/failure` - Payment failure webhook (public) ✅
+
+**Sessions:**
+
+- `POST /api/sessions/book` - Book a new session with creator ✅
+- `GET /api/sessions/me` - Get current user's sessions ✅
+- `GET /api/sessions/upcoming` - Get user's upcoming sessions ✅
+- `GET /api/sessions/creator/:creatorId` - Get creator's sessions ✅
+- `GET /api/sessions/:id` - Get session details ✅
+- `PATCH /api/sessions/:id/status` - Update session status ✅
+- `PATCH /api/sessions/:id/start` - Start session (mark as in progress) ✅
+- `PATCH /api/sessions/:id/complete` - Mark session as completed ✅
+- `PATCH /api/sessions/:id/cancel` - Cancel session ✅
+
 **Coming Soon:**
 
-- `POST /api/conversations/message` - Send chat message
-- `POST /api/payments/checkout` - Create checkout session
-- `POST /api/sessions/book` - Book live session
+- Notifications module
+- Admin module
 
 ## 🎯 Implementation Roadmap
 
@@ -528,13 +609,19 @@ npm run typeorm migration:revert
   - Message persistence
   - RAG context retrieval
   - AI response generation (simulated)
-- [ ] Payments module implementation
-  - Payment gateway integration (Whish)
-  - Subscription management
-  - Entitlement checks
-- [ ] Sessions module implementation
-  - Session booking
-  - Video integration
+- [x] Payments module implementation
+  - Whish payment gateway integration
+  - Transaction tracking with external IDs
+  - Entitlement system for agent access
+  - Multi-currency support (LBP, USD, AED)
+  - Webhook callbacks for payment status
+  - Balance checking and transaction history
+- [x] Sessions module implementation
+  - Session booking with conflict detection
+  - Video provider integration (Jitsi, Daily)
+  - Status management and lifecycle tracking
+  - Automatic video room generation
+  - Session reminders support
 
 ### Phase 5: Production Ready
 
