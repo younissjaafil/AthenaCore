@@ -8,9 +8,11 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AppModule = void 0;
 const common_1 = require("@nestjs/common");
+const core_1 = require("@nestjs/core");
 const app_controller_1 = require("./app.controller");
 const app_service_1 = require("./app.service");
 const config_module_1 = require("./config/config.module");
+const clerk_auth_guard_1 = require("./modules/auth/guards/clerk-auth.guard");
 const database_module_1 = require("./infrastructure/database/database.module");
 const redis_module_1 = require("./infrastructure/cache/redis.module");
 const s3_module_1 = require("./infrastructure/storage/s3.module");
@@ -56,7 +58,13 @@ exports.AppModule = AppModule = __decorate([
             health_module_1.HealthModule,
         ],
         controllers: [app_controller_1.AppController],
-        providers: [app_service_1.AppService],
+        providers: [
+            app_service_1.AppService,
+            {
+                provide: core_1.APP_GUARD,
+                useClass: clerk_auth_guard_1.ClerkAuthGuard,
+            },
+        ],
     })
 ], AppModule);
 //# sourceMappingURL=app.module.js.map

@@ -81,12 +81,18 @@ export class UsersService {
 
     if (existingUser) {
       // Update existing user
-      return this.usersRepository.update(existingUser.id, {
+      const updated = await this.usersRepository.update(existingUser.id, {
         email: clerkUserData.email_addresses[0]?.email_address,
         firstName: clerkUserData.first_name,
         lastName: clerkUserData.last_name,
         profileImageUrl: clerkUserData.image_url,
       });
+      if (!updated) {
+        throw new NotFoundException(
+          `User with ID ${existingUser.id} not found`,
+        );
+      }
+      return updated;
     }
 
     // Create new user

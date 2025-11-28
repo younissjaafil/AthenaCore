@@ -6,7 +6,7 @@ import { User } from '../users/entities/user.entity';
 export class AuthService {
   constructor(private usersService: UsersService) {}
 
-  async handleClerkWebhook(webhookData: any): Promise<User> {
+  async handleClerkWebhook(webhookData: any): Promise<User | null> {
     const { type, data } = webhookData;
 
     switch (type) {
