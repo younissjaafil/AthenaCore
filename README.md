@@ -28,7 +28,8 @@ A comprehensive NestJS monolith architecture for the Athena v1 AI agent platform
 
 - ✅ Creators module - Profile management, verification, statistics
 - ✅ Agents module - AI agent CRUD with RAG config, pricing, visibility
-- ⏳ Documents module (next)
+- ✅ Documents module - File upload, S3 storage, text extraction
+- ⏳ RAG module (next)
 - ⏳ Documents & RAG modules
 - ⏳ Conversations module
 - ⏳ Payments module (Whish integration)
@@ -357,7 +358,7 @@ npm run typeorm migration:revert
 
 - [x] Creators module - Profile creation, verification, public listing
 - [x] Agents CRUD - Create/manage AI agents with custom configs
-- [ ] Document upload & processing
+- [x] Document upload & processing - S3 storage, PDF/DOCX/TXT extraction
 - [ ] RAG implementation (embeddings, vector search)
 - [ ] Conversations & chat
 

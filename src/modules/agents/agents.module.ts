@@ -10,6 +10,6 @@ import { CreatorsModule } from '../creators/creators.module';
   imports: [TypeOrmModule.forFeature([Agent]), CreatorsModule],
   controllers: [AgentsController],
   providers: [AgentsService, AgentsRepository],
-  exports: [AgentsService],
+  exports: [AgentsService, AgentsRepository],
 })
 export class AgentsModule {}
