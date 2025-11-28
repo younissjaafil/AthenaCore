@@ -57,3 +57,6 @@ CLERK_SETUP.md
 
 test-infrastructure.ts
 /docs
+CONVERSATIONS_API.md
+
+enable-pgvector.ts
