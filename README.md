@@ -24,18 +24,59 @@ A comprehensive NestJS monolith architecture for the Athena v1 AI agent platform
 - ✅ Global authentication guard with @Public() decorator support
 - ✅ User service with CRUD operations
 
-### Phase 3: Feature Modules (In Progress)
+### Phase 3: Feature Modules ✅
 
 - ✅ Creators module - Profile management, verification, statistics
 - ✅ Agents module - AI agent CRUD with RAG config, pricing, visibility
-- ✅ Documents module - File upload, S3 storage, text extraction
-- ⏳ RAG module (next)
-- ⏳ Documents & RAG modules
-- ⏳ Conversations module
-- ⏳ Payments module (Whish integration)
-- ⏳ Sessions module
-- ⏳ Notifications module
-- ⏳ Admin module
+- ✅ Documents module - File upload, S3 storage, text extraction (PDF, DOCX, TXT)
+- ✅ RAG module - Embeddings generation, vector search, context retrieval
+
+### Phase 4: Advanced Features (Coming Soon)
+
+- ⏳ Conversations module - Real-time chat with RAG-powered agents
+- ⏳ Payments module - Whish payment gateway integration
+- ⏳ Sessions module - Live session booking with creators
+- ⏳ Notifications module - Email, SMS, push notifications
+- ⏳ Admin module - Administrative operations
+
+## 🧠 RAG Architecture
+
+### How It Works
+
+The RAG (Retrieval Augmented Generation) system enables AI agents to answer questions based on uploaded documents:
+
+1. **Document Upload** → User uploads PDF/DOCX/TXT files via Documents API
+2. **Text Extraction** → Content extracted using specialized parsers (pdf-parse, mammoth)
+3. **Chunking** → Text split into manageable chunks (default: 1000 chars with 200 overlap)
+4. **Embedding Generation** → Each chunk converted to 1536-dim vector using OpenAI
+5. **Storage** → Embeddings stored in PostgreSQL with pgvector extension
+6. **Search** → User query converted to embedding, cosine similarity search finds relevant chunks
+7. **Context Building** → Top results aggregated into context string (respects token limits)
+8. **Response** → Context used to power agent responses (integration pending in Conversations module)
+
+### Technical Details
+
+**Embedding Model:** OpenAI `text-embedding-3-small` (1536 dimensions)
+
+**Vector Search:** PostgreSQL pgvector with cosine similarity operator (`<=>`)
+
+**Chunking Strategy:**
+
+- Recursive character text splitter (LangChain)
+- Default chunk size: 1000 characters
+- Overlap: 200 characters (preserves context between chunks)
+
+**Caching:**
+
+- Redis caching for search results
+- 1-hour TTL to balance freshness and performance
+- Cache key includes query hash and parameters
+
+**Performance:**
+
+- Batch processing for embeddings
+- Database transactions for data consistency
+- Indexed on agentId, documentId for fast queries
 
 ## 🏗️ Architecture Overview
 
@@ -125,23 +166,28 @@ Swagger documentation is available at: `http://localhost:3000/docs`
 ## 📦 Core Dependencies
 
 - **NestJS 11** - Framework
-- **TypeORM** - Database ORM
-- **PostgreSQL** - Primary database
-- **Passport & JWT** - Authentication
+- **TypeORM** - Database ORM with repository pattern
+- **PostgreSQL with pgvector** - Primary database with vector search
+- **Passport & JWT** - Authentication (Clerk integration)
+- **OpenAI API** - Embeddings generation (text-embedding-3-small)
+- **LangChain** - Document chunking utilities
+- **AWS S3** - File storage for documents
+- **Redis** - Caching layer for search results
 - **Swagger** - API documentation
 - **class-validator** - DTO validation
-- **bcrypt** - Password hashing
-- **helmet** - Security headers
+- **pdf-parse** - PDF text extraction
+- **mammoth** - DOCX text extraction
+- **tiktoken** - Token counting for embeddings
 
 ## 🗂️ Module Responsibilities
 
 ### Infrastructure Modules
 
 - **ConfigModule**: Type-safe environment variable management with validation
-- **DatabaseModule**: TypeORM setup with PostgreSQL
-- **RedisModule**: Caching layer (stub, to be implemented)
-- **S3Module**: File storage (stub, to be implemented)
-- **VectorDbModule**: Vector embeddings storage for RAG (stub)
+- **DatabaseModule**: TypeORM setup with PostgreSQL and pgvector extension
+- **RedisModule**: Caching layer for embedding search results ✅
+- **S3Module**: AWS S3 file storage for documents ✅
+- **VectorStoreModule**: pgvector integration for RAG embeddings ✅
 - **QueueModule**: Async job processing (stub)
 - **HttpModule**: External API calls wrapper (stub)
 
@@ -172,19 +218,23 @@ Swagger documentation is available at: `http://localhost:3000/docs`
 - Visibility settings (public/private)
 - Model provider abstraction
 
-#### 📄 Documents Module
+#### 📄 Documents Module ✅
 
 - Document upload for agent training
-- File storage (S3)
-- Text extraction & chunking
-- Metadata persistence
+- S3 file storage with presigned URLs
+- Text extraction (PDF, DOCX, TXT)
+- Document metadata persistence
+- Integration with RAG pipeline
 
-#### 🧠 RAG Module
+#### 🧠 RAG Module ✅
 
-- Embedding generation
-- Vector search
-- Context building for chat
-- LLM provider abstraction
+- OpenAI embeddings generation (text-embedding-3-small, 1536 dimensions)
+- Document chunking with configurable size/overlap (RecursiveCharacterTextSplitter)
+- pgvector integration for similarity search
+- Cosine similarity search with threshold filtering
+- Redis caching for search results (1-hour TTL)
+- Context aggregation with token limits
+- Agent-level search statistics
 
 #### 💬 Conversations Module
 
@@ -259,11 +309,36 @@ Swagger documentation is available at: `http://localhost:3000/docs`
 See `.env.development` for all available variables:
 
 ```env
+# Server
 NODE_ENV=development
 PORT=3000
-POSTGRES_DB=postgresql://...
-JWT_SECRET=your-secret-key
-# ... more
+
+# Database
+POSTGRES_DB=postgresql://user:pass@host:port/database
+
+# Authentication (Clerk)
+CLERK_PUBLISHABLE_KEY=pk_test_...
+CLERK_SECRET_KEY=sk_test_...
+CLERK_WEBHOOK_SECRET=whsec_...
+JWT_SECRET=your-jwt-secret
+
+# AWS S3
+AWS_REGION=us-east-1
+AWS_ACCESS_KEY_ID=your-access-key
+AWS_SECRET_ACCESS_KEY=your-secret-key
+S3_BUCKET_NAME=athena-documents
+
+# Redis
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=optional-password
+
+# OpenAI
+OPENAI_API_KEY=sk-...
+
+# Payments (Whish)
+WHISH_API_KEY=your-whish-key
+WHISH_WEBHOOK_SECRET=whsec_...
 ```
 
 ## 🛠️ Development Workflow
@@ -324,15 +399,53 @@ npm run typeorm migration:revert
 - `GET /api/health` - Health check
 - `GET /docs` - Swagger API documentation
 
-### Module Endpoints (To be implemented)
+### Module Endpoints
 
-- `POST /api/auth/login` - User login
-- `GET /api/users/me` - Current user profile
-- `POST /api/agents` - Create agent
-- `POST /api/documents/upload` - Upload training document
+**Authentication & Users:**
+
+- `POST /api/auth/webhook` - Clerk webhook handler ✅
+- `GET /api/users/me` - Current user profile ✅
+- `GET /api/users/:id` - Get user by ID ✅
+
+**Creators:**
+
+- `POST /api/creators` - Create creator profile ✅
+- `GET /api/creators` - List all creators ✅
+- `GET /api/creators/:id` - Get creator details ✅
+- `PATCH /api/creators/:id` - Update creator profile ✅
+- `DELETE /api/creators/:id` - Delete creator ✅
+- `GET /api/creators/:id/stats` - Get creator statistics ✅
+
+**Agents:**
+
+- `POST /api/agents` - Create AI agent ✅
+- `GET /api/agents` - List agents with filters ✅
+- `GET /api/agents/:id` - Get agent details ✅
+- `PATCH /api/agents/:id` - Update agent ✅
+- `DELETE /api/agents/:id` - Delete agent ✅
+- `GET /api/agents/creator/:creatorId` - List creator's agents ✅
+
+**Documents:**
+
+- `POST /api/documents/upload` - Upload training document ✅
+- `GET /api/documents/:id` - Get document details ✅
+- `GET /api/documents/agent/:agentId` - List agent's documents ✅
+- `DELETE /api/documents/:id` - Delete document ✅
+- `GET /api/documents/:id/download` - Download document ✅
+
+**RAG (Retrieval Augmented Generation):**
+
+- `POST /api/rag/process/:documentId` - Process document into embeddings ✅
+- `POST /api/rag/search` - Semantic similarity search ✅
+- `GET /api/rag/context/:agentId` - Get context for query ✅
+- `GET /api/rag/stats/:agentId` - Get agent embedding statistics ✅
+- `GET /api/rag/embeddings/:documentId` - List document embeddings ✅
+
+**Coming Soon:**
+
 - `POST /api/conversations/message` - Send chat message
 - `POST /api/payments/checkout` - Create checkout session
-- ... more to come
+- `POST /api/sessions/book` - Book live session
 
 ## 🎯 Implementation Roadmap
 
@@ -354,17 +467,18 @@ npm run typeorm migration:revert
 - [x] Global authentication guard
 - [x] Role-based access control (@Roles decorator ready)
 
-### Phase 3: Core Features
+### Phase 3: Core Features ✅
 
 - [x] Creators module - Profile creation, verification, public listing
 - [x] Agents CRUD - Create/manage AI agents with custom configs
 - [x] Document upload & processing - S3 storage, PDF/DOCX/TXT extraction
-- [ ] RAG implementation (embeddings, vector search)
-- [ ] Conversations & chat
+- [x] RAG implementation - OpenAI embeddings, pgvector search, context retrieval
+- [x] Vector search with Redis caching
 
 ### Phase 4: Payments & Sessions
 
-- [ ] Payment gateway integration
+- [ ] Conversations & chat with RAG-powered responses
+- [ ] Payment gateway integration (Whish)
 - [ ] Subscription management
 - [ ] Entitlement checks
 - [ ] Session booking & video integration
@@ -422,6 +536,17 @@ This project is configured for deployment on Railway via GitHub integration.
      ```sql
      CREATE EXTENSION IF NOT EXISTS vector;
      ```
+   - Run migrations if needed:
+     ```bash
+     npm run typeorm migration:run
+     ```
+
+5. **Environment Variables**:
+   - Add all required variables to Railway's environment settings
+   - Use Railway's PostgreSQL add-on for `POSTGRES_DB`
+   - Add OpenAI API key for RAG functionality
+   - Configure AWS S3 credentials for document storage
+   - Set up Clerk credentials for authentication
 
 ### Railway Configuration (`railway.json`)
 
