@@ -1,1 +1,54 @@
-node_modules
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Build
+dist/
+build/
+*.js.map
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Testing
+.jest/
+
+# TypeORM
+ormconfig.json
+
+# Misc
+.cache/
+temp/
+tmp/
+
+README.md
+
+IMPLEMENTATION_SUMMARY.md
+
+.env.production
