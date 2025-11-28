@@ -59,7 +59,10 @@ A comprehensive NestJS monolith architecture for the Athena v1 AI agent platform
   - Status management (pending, confirmed, in-progress, completed)
   - Automatic video room generation
   - Session lifecycle tracking
-- ⏳ Notifications module - Email, SMS, push notifications
+- ✅ Notifications module - Email, push notifications with Resend and BullMQ
+  - Transactional emails (welcome, payment confirmations, session reminders)
+  - Queue-based async delivery with retry logic
+  - Email templates with HTML/text formats
 - ⏳ Admin module - Administrative operations
 
 ## 🧠 RAG Architecture
@@ -346,11 +349,41 @@ Swagger documentation is available at: `http://localhost:3000/docs`
 - Support for session duration, pricing, and notes
 - Metadata storage for cancellations and rescheduling
 
-#### 🔔 Notifications Module
+#### 🔔 Notifications Module ✅
 
-- Unified notification service
-- Email, SMS, push notifications
-- Used by payments, sessions, admin
+- **Email Delivery** - Resend API integration for transactional emails
+- **Queue System** - BullMQ for async notification processing with retry logic
+- **Email Templates** - Pre-built HTML templates for common scenarios
+- **Notification Tracking** - Database persistence of all sent notifications
+- **Priority Management** - Support for urgent, high, normal, and low priority
+
+**Features:**
+
+- Send custom emails with HTML and text versions
+- Use pre-built templates (welcome, payment confirmation, session booking, session reminder)
+- Queue-based async delivery ensures reliability
+- Automatic retry on failure (3 attempts with exponential backoff)
+- Track notification status (pending, sent, failed, delivered)
+- Fetch user notification history
+- Template data injection for personalized emails
+
+**Email Templates:**
+
+- **Welcome Email** - User onboarding with optional verification link
+- **Payment Confirmation** - Transaction details with receipt information
+- **Session Booking** - Confirmation with video link and session details
+- **Session Reminder** - 1-hour reminder before session starts
+
+**Technical Implementation:**
+
+- ResendService - Wrapper for Resend API with error handling
+- NotificationsService - Business logic for queuing and sending
+- EmailProcessor - BullMQ worker for async email delivery
+- NotificationsRepository - Notification entity persistence
+- NotificationsController - 4 REST endpoints (send, send-template, my, get by ID)
+- BullMQ configuration with Redis backend
+- Exponential backoff retry strategy (2s initial delay)
+- Job cleanup: 24h for completed, 7 days for failed
 
 #### ⚙️ Admin Module
 
@@ -429,6 +462,10 @@ OPENAI_API_KEY=sk-...
 # Payments (Whish)
 WHISH_API_KEY=your-whish-key
 WHISH_WEBHOOK_SECRET=whsec_...
+
+# Email (Resend)
+RESEND_API_KEY=re_...
+RESEND_FROM_EMAIL=noreply@athena.ai
 ```
 
 ## 🛠️ Development Workflow
