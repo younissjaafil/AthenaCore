@@ -477,7 +477,7 @@ npm run typeorm migration:revert
 
 ### Phase 4: Payments & Sessions
 
-- [x] Test infrastructure connections - All services connected ✅
+- [x] Test infrastructure connections - All services connected
   - PostgreSQL (Railway)
   - Redis (Railway)
   - AWS S3 (eu-north-1)
