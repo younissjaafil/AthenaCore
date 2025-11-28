@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '../../config/config.module';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { VectorDbService } from './vectordb.service';
 
 @Module({
-  imports: [ConfigModule],
+  imports: [TypeOrmModule],
   providers: [VectorDbService],
   exports: [VectorDbService],
 })
