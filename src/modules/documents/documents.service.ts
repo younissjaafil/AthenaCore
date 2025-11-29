@@ -9,10 +9,13 @@ import {
   NotFoundException,
   ForbiddenException,
   Logger,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { DocumentsRepository } from './repositories/documents.repository';
 import { S3Service } from '../../infrastructure/storage/s3.service';
 import { AgentsRepository } from '../agents/repositories/agents.repository';
+import { EmbeddingsService } from '../rag/embeddings.service';
 import { UploadDocumentDto } from './dto/upload-document.dto';
 import { DocumentResponseDto } from './dto/document-response.dto';
 import {
@@ -43,6 +46,8 @@ export class DocumentsService {
     private readonly documentsRepository: DocumentsRepository,
     private readonly agentsRepository: AgentsRepository,
     private readonly s3Service: S3Service,
+    @Inject(forwardRef(() => EmbeddingsService))
+    private readonly embeddingsService: EmbeddingsService,
   ) {}
 
   async uploadDocument(
@@ -156,13 +161,31 @@ export class DocumentsService {
         document.fileType as DocumentType,
       );
 
-      // Update document with extracted text and mark as processed
+      // Update document with extracted text
       await this.documentsRepository.update(documentId, {
         extractedText,
+        status: DocumentStatus.PROCESSING,
+      });
+
+      // Generate chunks and embeddings
+      this.logger.log(`Generating embeddings for document ${documentId}...`);
+      await this.embeddingsService.processDocument(documentId);
+
+      // Get the embeddings count and update document
+      const embeddings =
+        await this.embeddingsService.getDocumentEmbeddings(documentId);
+      const chunkCount = embeddings.length;
+
+      // Mark as fully processed with chunk counts
+      await this.documentsRepository.update(documentId, {
+        chunkCount,
+        embeddingCount: chunkCount,
         status: DocumentStatus.PROCESSED,
       });
 
-      this.logger.log(`Document ${documentId} processed successfully`);
+      this.logger.log(
+        `Document ${documentId} processed successfully with ${chunkCount} chunks`,
+      );
     } catch (error: any) {
       this.logger.error(
         `Document processing failed for ${documentId}:`,
@@ -238,15 +261,21 @@ export class DocumentsService {
     return this.toResponseDto(document);
   }
 
-  async deleteDocument(id: string, creatorId: string): Promise<void> {
+  async deleteDocument(id: string, userId: string): Promise<void> {
     const document = await this.documentsRepository.findById(id);
     if (!document) {
       throw new NotFoundException('Document not found');
     }
 
-    // Check if creator owns the agent
+    // Check if user owns the agent (via creator relationship)
+    // findById already includes creator relation
     const agent = await this.agentsRepository.findById(document.agentId);
-    if (!agent || agent.creatorId !== creatorId) {
+    if (!agent) {
+      throw new NotFoundException('Agent not found');
+    }
+
+    // Check if the agent's creator belongs to this user
+    if (!agent.creator || agent.creator.userId !== userId) {
       throw new ForbiddenException(
         'You can only delete documents from your own agents',
       );

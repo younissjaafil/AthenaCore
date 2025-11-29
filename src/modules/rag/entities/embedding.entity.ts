@@ -50,13 +50,9 @@ export class Embedding {
   @Column({ type: 'int', nullable: true })
   endPosition?: number;
 
-  // Vector embedding (1536 dimensions for text-embedding-3-small)
-  @Column({
-    type: 'vector',
-    length: 1536,
-  })
-  @Index('embedding_vector_idx', { synchronize: false })
-  vector: number[];
+  // Note: Vector is stored in Qdrant, not PostgreSQL
+  // This field is kept for type compatibility but not persisted
+  vector?: number[];
 
   // Embedding metadata
   @Column({ default: 'text-embedding-3-small' })

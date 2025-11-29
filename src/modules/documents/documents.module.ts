@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DocumentsController } from './documents.controller';
 import { DocumentsService } from './documents.service';
@@ -7,6 +7,7 @@ import { DocumentsRepository } from './repositories/documents.repository';
 import { AgentsModule } from '../agents/agents.module';
 import { S3Module } from '../../infrastructure/storage/s3.module';
 import { UsersModule } from '../users/users.module';
+import { RagModule } from '../rag/rag.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { UsersModule } from '../users/users.module';
     AgentsModule,
     S3Module,
     UsersModule,
+    forwardRef(() => RagModule),
   ],
   controllers: [DocumentsController],
   providers: [DocumentsService, DocumentsRepository],

@@ -3,6 +3,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Embedding } from '../entities/embedding.entity';
+import { QdrantService } from '../../../infrastructure/vector-store/qdrant.service';
+import { v4 as uuidv4 } from 'uuid';
 
 export interface SimilaritySearchResult {
   embedding: Embedding;
@@ -16,16 +18,74 @@ export class EmbeddingsRepository {
   constructor(
     @InjectRepository(Embedding)
     private readonly repository: Repository<Embedding>,
+    private readonly qdrantService: QdrantService,
   ) {}
 
   async create(data: Partial<Embedding>): Promise<Embedding> {
-    const embedding = this.repository.create(data);
-    return this.repository.save(embedding);
+    // Generate ID if not provided
+    const id = data.id || uuidv4();
+    const embeddingData = { ...data, id };
+
+    // Save metadata to PostgreSQL (without vector)
+    const embedding = this.repository.create(embeddingData);
+    const saved = await this.repository.save(embedding);
+
+    // Store vector in Qdrant
+    if (data.vector) {
+      await this.qdrantService.upsertPoints([
+        {
+          id: saved.id,
+          vector: data.vector,
+          payload: {
+            agentId: saved.agentId,
+            documentId: saved.documentId,
+            chunkIndex: saved.chunkIndex,
+            content: saved.content,
+            tokenCount: saved.tokenCount,
+          },
+        },
+      ]);
+    }
+
+    return saved;
   }
 
   async createBulk(data: Partial<Embedding>[]): Promise<Embedding[]> {
-    const embeddings = this.repository.create(data);
-    return this.repository.save(embeddings);
+    // Generate IDs and prepare data
+    const embeddingsWithIds = data.map((d) => ({
+      ...d,
+      id: d.id || uuidv4(),
+    }));
+
+    // Save metadata to PostgreSQL
+    const embeddings = this.repository.create(embeddingsWithIds);
+    const saved = await this.repository.save(embeddings);
+
+    // Store vectors in Qdrant
+    const vectorPoints = saved
+      .map((embedding, idx) => {
+        const vector = data[idx].vector;
+        if (!vector) return null;
+        return {
+          id: embedding.id,
+          vector,
+          payload: {
+            agentId: embedding.agentId,
+            documentId: embedding.documentId,
+            chunkIndex: embedding.chunkIndex,
+            content: embedding.content,
+            tokenCount: embedding.tokenCount,
+          },
+        };
+      })
+      .filter((p): p is NonNullable<typeof p> => p !== null);
+
+    if (vectorPoints.length > 0) {
+      await this.qdrantService.upsertPoints(vectorPoints);
+      this.logger.log(`Stored ${vectorPoints.length} vectors in Qdrant`);
+    }
+
+    return saved;
   }
 
   async findById(id: string): Promise<Embedding | null> {
@@ -56,53 +116,44 @@ export class EmbeddingsRepository {
     limit: number = 5,
     threshold: number = 0.7,
   ): Promise<SimilaritySearchResult[]> {
-    // Use pgvector's <=> operator for cosine distance
-    // Cosine distance returns 0 for identical vectors, 2 for opposite
-    // Similarity = 1 - (distance / 2)
-    const query = `
-      SELECT 
-        e.*,
-        1 - (e.vector <=> $1::vector) as similarity
-      FROM embeddings e
-      WHERE e."agentId" = $2
-        AND 1 - (e.vector <=> $1::vector) >= $3
-      ORDER BY e.vector <=> $1::vector
-      LIMIT $4
-    `;
-
-    const results = await this.repository.query(query, [
-      JSON.stringify(queryVector),
+    // Search in Qdrant
+    const results = await this.qdrantService.search(
       agentId,
-      threshold,
+      queryVector,
       limit,
-    ]);
+      threshold,
+    );
 
-    return results.map((row: any) => ({
-      embedding: this.repository.create({
-        id: row.id,
-        agentId: row.agentId,
-        documentId: row.documentId,
-        chunkIndex: row.chunkIndex,
-        content: row.content,
-        tokenCount: row.tokenCount,
-        startPosition: row.startPosition,
-        endPosition: row.endPosition,
-        vector: row.vector,
-        model: row.model,
-        metadata: row.metadata,
-        createdAt: row.createdAt,
-        updatedAt: row.updatedAt,
-      }),
-      similarity: parseFloat(row.similarity),
-    }));
+    // Fetch full embedding records from PostgreSQL
+    const embeddingResults: SimilaritySearchResult[] = [];
+    for (const result of results) {
+      const embedding = await this.repository.findOne({
+        where: { id: result.id },
+        relations: ['document', 'agent'],
+      });
+      if (embedding) {
+        embeddingResults.push({
+          embedding,
+          similarity: result.score,
+        });
+      }
+    }
+
+    return embeddingResults;
   }
 
   async deleteByDocument(documentId: string): Promise<void> {
+    // Delete from both Qdrant and PostgreSQL
+    await this.qdrantService.deleteByDocument(documentId);
     await this.repository.delete({ documentId });
+    this.logger.log(`Deleted embeddings for document ${documentId}`);
   }
 
   async deleteByAgent(agentId: string): Promise<void> {
+    // Delete from both Qdrant and PostgreSQL
+    await this.qdrantService.deleteByAgent(agentId);
     await this.repository.delete({ agentId });
+    this.logger.log(`Deleted embeddings for agent ${agentId}`);
   }
 
   async countByAgent(agentId: string): Promise<number> {
