@@ -22,7 +22,8 @@ import {
 } from './entities/document.entity';
 import { extname } from 'path';
 import * as mammoth from 'mammoth';
-import { PDFParse } from 'pdf-parse';
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const pdfParse = require('pdf-parse');
 
 @Injectable()
 export class DocumentsService {
@@ -183,13 +184,11 @@ export class DocumentsService {
       switch (type) {
         case DocumentType.PDF: {
           this.logger.log('Extracting text from PDF...');
-          const parser = new PDFParse({ data: buffer });
-          const textResult = await parser.getText();
-          await parser.destroy();
+          const pdfData = await pdfParse(buffer);
           this.logger.log(
-            `PDF extracted: ${textResult.total} pages, ${textResult.text.length} chars`,
+            `PDF extracted: ${pdfData.numpages} pages, ${pdfData.text.length} chars`,
           );
-          return textResult.text;
+          return pdfData.text;
         }
 
         case DocumentType.DOCX: {
