@@ -8,11 +8,13 @@ import { Conversation } from './entities/conversation.entity';
 import { Message } from './entities/message.entity';
 import { Agent } from '../agents/entities/agent.entity';
 import { RagModule } from '../rag/rag.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Conversation, Message, Agent]),
     RagModule,
+    AuthModule,
   ],
   controllers: [ConversationsController],
   providers: [

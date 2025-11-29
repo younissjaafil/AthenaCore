@@ -7,6 +7,7 @@ import { NotificationsController } from './notifications.controller';
 import { Notification } from './entities/notification.entity';
 import { ResendService } from './services/resend.service';
 import { EmailProcessor } from './processors/email.processor';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { EmailProcessor } from './processors/email.processor';
       name: 'email-queue',
     }),
     ConfigModule,
+    AuthModule,
   ],
   controllers: [NotificationsController],
   providers: [NotificationsService, ResendService, EmailProcessor],

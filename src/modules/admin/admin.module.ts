@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
+import { AuthModule } from '../auth/auth.module';
 import { User } from '../users/entities/user.entity';
 import { Creator } from '../creators/entities/creator.entity';
 import { Agent } from '../agents/entities/agent.entity';
@@ -15,6 +16,7 @@ import { Embedding } from '../rag/entities/embedding.entity';
 
 @Module({
   imports: [
+    AuthModule,
     TypeOrmModule.forFeature([
       User,
       Creator,
