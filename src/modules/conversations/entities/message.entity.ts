@@ -21,14 +21,14 @@ export class Message {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'uuid' })
+  @Column({ name: 'conversation_id', type: 'uuid' })
   conversationId: string;
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access
   @ManyToOne(() => Conversation, (conversation: any) => conversation.messages, {
     onDelete: 'CASCADE',
   })
-  @JoinColumn({ name: 'conversationId' })
+  @JoinColumn({ name: 'conversation_id' })
   conversation: Conversation;
 
   @Column({
@@ -53,9 +53,9 @@ export class Message {
     error?: string;
   };
 
-  @Column({ type: 'int', default: 0 })
+  @Column({ name: 'token_count', type: 'int', default: 0 })
   tokenCount: number;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 }

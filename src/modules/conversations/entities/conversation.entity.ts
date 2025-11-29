@@ -26,18 +26,18 @@ export class Conversation {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'uuid' })
+  @Column({ name: 'user_id', type: 'uuid' })
   userId: string;
 
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'userId' })
+  @JoinColumn({ name: 'user_id' })
   user: User;
 
-  @Column({ type: 'uuid' })
+  @Column({ name: 'agent_id', type: 'uuid' })
   agentId: string;
 
   @ManyToOne(() => Agent, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'agentId' })
+  @JoinColumn({ name: 'agent_id' })
   agent: Agent;
 
   @Column({ type: 'varchar', length: 200, nullable: true })
@@ -50,10 +50,10 @@ export class Conversation {
   })
   status: ConversationStatus;
 
-  @Column({ type: 'int', default: 0 })
+  @Column({ name: 'message_count', type: 'int', default: 0 })
   messageCount: number;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ name: 'last_message_at', type: 'timestamp', nullable: true })
   lastMessageAt: Date;
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access
@@ -62,9 +62,9 @@ export class Conversation {
   })
   messages: Message[];
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 }
