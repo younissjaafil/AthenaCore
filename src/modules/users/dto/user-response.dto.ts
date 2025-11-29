@@ -23,6 +23,12 @@ export class UserResponseDto {
   @ApiProperty({ enum: UserRole, example: UserRole.STUDENT })
   role: UserRole;
 
+  @ApiProperty({ example: false })
+  isAdmin: boolean;
+
+  @ApiProperty({ example: false })
+  hasCompletedOnboarding: boolean;
+
   @ApiProperty({ example: true })
   isActive: boolean;
 

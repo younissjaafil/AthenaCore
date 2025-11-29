@@ -149,6 +149,8 @@ export class UsersService {
       fullName: user.fullName,
       profileImageUrl: user.profileImageUrl,
       role: user.role,
+      isAdmin: user.isAdmin,
+      hasCompletedOnboarding: user.hasCompletedOnboarding,
       isActive: user.isActive,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
