@@ -22,6 +22,7 @@ import {
 } from './entities/document.entity';
 import { extname } from 'path';
 import * as mammoth from 'mammoth';
+import { PDFParse } from 'pdf-parse';
 
 @Injectable()
 export class DocumentsService {
@@ -181,36 +182,28 @@ export class DocumentsService {
     try {
       switch (type) {
         case DocumentType.PDF: {
-          // Dynamically import pdfjs-dist (ES module)
-          const pdfjsLib = await import('pdfjs-dist');
-
-          // Load PDF document
-          const loadingTask = pdfjsLib.getDocument({
-            data: new Uint8Array(buffer),
-            useSystemFonts: true,
-            standardFontDataUrl: undefined,
-          });
-          const pdf = await loadingTask.promise;
-
-          // Extract text from all pages
-          const textPromises: Promise<string>[] = [];
-          for (let i = 1; i <= pdf.numPages; i++) {
-            textPromises.push(
-              pdf.getPage(i).then(async (page) => {
-                const textContent = await page.getTextContent();
-                return textContent.items.map((item: any) => item.str).join(' ');
-              }),
-            );
-          }
-
-          const texts = await Promise.all(textPromises);
-          return texts.join('\n\n');
+          this.logger.log('Extracting text from PDF...');
+          const parser = new PDFParse({ data: buffer });
+          const textResult = await parser.getText();
+          await parser.destroy();
+          this.logger.log(
+            `PDF extracted: ${textResult.total} pages, ${textResult.text.length} chars`,
+          );
+          return textResult.text;
         }
 
         case DocumentType.DOCX: {
+          this.logger.log('Extracting text from DOCX...');
           const docxResult = await mammoth.extractRawText({ buffer });
           return docxResult.value;
         }
+
+        case DocumentType.TXT:
+        case DocumentType.MD:
+        case DocumentType.HTML:
+        case DocumentType.CSV:
+        case DocumentType.JSON:
+          return buffer.toString('utf-8');
 
         default:
           return buffer.toString('utf-8');
