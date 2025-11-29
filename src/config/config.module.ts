@@ -1,12 +1,12 @@
-import { Module } from '@nestjs/common';
+import { Module, Global } from '@nestjs/common';
 import { ConfigModule as NestConfigModule } from '@nestjs/config';
 import { ConfigService } from './config.service';
 import { plainToClass } from 'class-transformer';
 import { validateSync } from 'class-validator';
 import { EnvironmentVariables } from './validation.env';
 
+@Global()
 @Module({
-  global: true,
   imports: [
     NestConfigModule.forRoot({
       isGlobal: true,
