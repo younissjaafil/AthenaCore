@@ -14,7 +14,7 @@ async function bootstrap() {
   // CORS
   app.enableCors({
     origin: [
-      'http://localhost:3000',
+      'http://localhost:4000',
       'https://athena-front-beta.vercel.app',
       'https://athena-ai.pro',
       process.env.CORS_ORIGIN,

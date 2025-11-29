@@ -13,7 +13,7 @@ export class User {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ unique: true })
+  @Column({ name: 'clerk_id', unique: true })
   @Index()
   clerkId: string;
 
@@ -21,13 +21,13 @@ export class User {
   @Index()
   email: string;
 
-  @Column({ nullable: true })
+  @Column({ name: 'first_name', nullable: true })
   firstName?: string;
 
-  @Column({ nullable: true })
+  @Column({ name: 'last_name', nullable: true })
   lastName?: string;
 
-  @Column({ nullable: true })
+  @Column({ name: 'profile_image_url', nullable: true })
   profileImageUrl?: string;
 
   @Column({
@@ -37,22 +37,22 @@ export class User {
   })
   role: UserRole;
 
-  @Column({ default: false })
+  @Column({ name: 'is_admin', default: false })
   isAdmin: boolean;
 
-  @Column({ default: false })
+  @Column({ name: 'has_completed_onboarding', default: false })
   hasCompletedOnboarding: boolean;
 
-  @Column({ default: true })
+  @Column({ name: 'is_active', default: true })
   isActive: boolean;
 
   @Column({ type: 'jsonb', nullable: true })
   metadata?: Record<string, any>;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 
   // Virtual property for full name
