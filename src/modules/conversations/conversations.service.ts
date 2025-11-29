@@ -4,8 +4,10 @@ import {
   BadRequestException,
   Logger,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import OpenAI from 'openai';
 import { ConversationsRepository } from './repositories/conversations.repository';
 import { MessagesRepository } from './repositories/messages.repository';
 import { VectorSearchService } from '../rag/vector-search.service';
@@ -23,14 +25,19 @@ import { MessageResponseDto } from './dto/message-response.dto';
 @Injectable()
 export class ConversationsService {
   private readonly logger = new Logger(ConversationsService.name);
+  private readonly openai: OpenAI;
 
   constructor(
+    private readonly configService: ConfigService,
     private readonly conversationsRepository: ConversationsRepository,
     private readonly messagesRepository: MessagesRepository,
     private readonly vectorSearchService: VectorSearchService,
     @InjectRepository(Agent)
     private readonly agentRepository: Repository<Agent>,
-  ) {}
+  ) {
+    const apiKey = this.configService.get<string>('OPENAI_API_KEY');
+    this.openai = new OpenAI({ apiKey });
+  }
 
   /**
    * Create a new conversation
@@ -284,27 +291,48 @@ export class ConversationsService {
 
     // Build the prompt
     const systemPrompt = this.buildSystemPrompt(conversation.agent, ragContext);
-    const messages = [
+    const messages: Array<{
+      role: 'system' | 'user' | 'assistant';
+      content: string;
+    }> = [
       { role: 'system', content: systemPrompt },
-      ...history,
+      ...history.map((h) => ({
+        role: h.role as 'user' | 'assistant',
+        content: h.content,
+      })),
       { role: 'user', content: userQuery },
     ];
 
-    // For now, return a simulated response
-    // In production, this would call OpenAI API with the messages
-    const response = this.simulateAIResponse(
-      conversation.agent,
-      userQuery,
-      ragContext,
-    );
+    // Call OpenAI API
+    let responseContent: string;
+    try {
+      const completion = await this.openai.chat.completions.create({
+        model: conversation.agent.model || 'gpt-4',
+        messages,
+        temperature: Number(conversation.agent.temperature) || 0.7,
+        max_tokens: conversation.agent.maxTokens || 2000,
+      });
+
+      responseContent =
+        completion.choices[0]?.message?.content ||
+        'I apologize, but I was unable to generate a response. Please try again.';
+
+      this.logger.log(
+        `OpenAI response generated for conversation ${conversation.id}, tokens: ${completion.usage?.total_tokens}`,
+      );
+    } catch (error: any) {
+      this.logger.error(`OpenAI API error: ${error.message}`);
+      responseContent =
+        'I apologize, but I encountered an error while processing your request. Please try again later.';
+    }
 
     return {
-      content: response,
+      content: responseContent,
       metadata: {
         model: conversation.agent.model,
         ragContext: useRag && ragSources.length > 0,
         ragSources: ragSources.length > 0 ? ragSources : undefined,
-        tokensUsed: this.estimateTokens(systemPrompt + response),
+        tokensUsed: this.estimateTokens(systemPrompt + responseContent),
       },
     };
   }
@@ -321,21 +349,6 @@ export class ConversationsService {
     }
 
     return prompt;
-  }
-
-  /**
-   * Simulate AI response (placeholder for OpenAI integration)
-   */
-  private simulateAIResponse(
-    agent: Agent,
-    userQuery: string,
-    ragContext: string,
-  ): string {
-    if (ragContext) {
-      return `Based on the knowledge base, I can help you with "${userQuery}". ${ragContext.substring(0, 200)}... [This is a simulated response. In production, this would use ${agent.model} to generate a proper response based on the RAG context.]`;
-    }
-
-    return `I understand you're asking about "${userQuery}". [This is a simulated response. In production, this would use ${agent.model} to generate a proper response. Note: No relevant context was found in the knowledge base.]`;
   }
 
   /**
