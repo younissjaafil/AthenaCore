@@ -104,6 +104,10 @@ export class QdrantService implements OnModuleInit {
     scoreThreshold: number = 0.7,
   ): Promise<SearchResult[]> {
     try {
+      this.logger.log(
+        `Qdrant search - Collection: ${this.collectionName}, AgentId: ${agentId}, Limit: ${limit}, Threshold: ${scoreThreshold}`,
+      );
+
       const results = await this.client.search(this.collectionName, {
         vector: queryVector,
         limit,
@@ -118,6 +122,14 @@ export class QdrantService implements OnModuleInit {
         },
         with_payload: true,
       });
+
+      this.logger.log(`Qdrant found ${results.length} matching vectors`);
+
+      if (results.length > 0) {
+        this.logger.log(
+          `Top result - Score: ${results[0].score}, ID: ${results[0].id}`,
+        );
+      }
 
       return results.map((r) => ({
         id: r.id as string,

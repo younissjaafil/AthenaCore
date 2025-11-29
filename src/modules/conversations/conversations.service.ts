@@ -249,11 +249,19 @@ export class ConversationsService {
     // Get RAG context if enabled
     if (useRag) {
       try {
+        this.logger.log(
+          `RAG search for agent ${conversation.agentId}: "${userQuery.substring(0, 50)}..."`,
+        );
+
         const searchResults = await this.vectorSearchService.search(
           conversation.agentId,
           userQuery,
           5,
-          0.6,
+          0.5, // Lowered threshold for better recall
+        );
+
+        this.logger.log(
+          `RAG search returned ${searchResults.length} results for agent ${conversation.agentId}`,
         );
 
         if (searchResults.length > 0) {
