@@ -18,31 +18,30 @@ export class DocumentsRepository {
   async findById(id: string): Promise<Document | null> {
     return this.repository.findOne({
       where: { id },
-      relations: ['agent', 'user'],
+      relations: ['agent'],
     });
   }
 
   async findByAgent(agentId: string): Promise<Document[]> {
     return this.repository.find({
-      where: { agentId, status: DocumentStatus.COMPLETED },
+      where: { agentId, status: DocumentStatus.PROCESSED },
       order: { createdAt: 'DESC' },
     });
   }
 
-  async findByUser(userId: string): Promise<Document[]> {
-    return this.repository.find({
-      where: { userId },
-      relations: ['agent'],
-      order: { createdAt: 'DESC' },
-    });
+  async findByAgentList(agentIds: string[]): Promise<Document[]> {
+    if (agentIds.length === 0) return [];
+    return this.repository
+      .createQueryBuilder('document')
+      .where('document.agent_id IN (:...agentIds)', { agentIds })
+      .leftJoinAndSelect('document.agent', 'agent')
+      .orderBy('document.created_at', 'DESC')
+      .getMany();
   }
 
-  async findByAgentAndUser(
-    agentId: string,
-    userId: string,
-  ): Promise<Document[]> {
+  async findAllByAgent(agentId: string): Promise<Document[]> {
     return this.repository.find({
-      where: { agentId, userId },
+      where: { agentId },
       order: { createdAt: 'DESC' },
     });
   }
@@ -50,7 +49,7 @@ export class DocumentsRepository {
   async findPendingProcessing(): Promise<Document[]> {
     return this.repository.find({
       where: [
-        { status: DocumentStatus.UPLOADING },
+        { status: DocumentStatus.UPLOADED },
         { status: DocumentStatus.PROCESSING },
       ],
       order: { createdAt: 'ASC' },
@@ -70,11 +69,7 @@ export class DocumentsRepository {
   ): Promise<void> {
     const updateData: Partial<Document> = { status };
 
-    if (status === DocumentStatus.PROCESSING) {
-      updateData.processingStartedAt = new Date();
-    } else if (status === DocumentStatus.COMPLETED) {
-      updateData.processingCompletedAt = new Date();
-    } else if (status === DocumentStatus.FAILED && errorMessage) {
+    if (status === DocumentStatus.FAILED && errorMessage) {
       updateData.errorMessage = errorMessage;
     }
 
@@ -86,9 +81,6 @@ export class DocumentsRepository {
     metrics: {
       chunkCount?: number;
       embeddingCount?: number;
-      characterCount?: number;
-      wordCount?: number;
-      pageCount?: number;
     },
   ): Promise<void> {
     await this.repository.update(id, metrics);
@@ -113,11 +105,11 @@ export class DocumentsRepository {
 
     return {
       total: documents.length,
-      completed: documents.filter((d) => d.status === DocumentStatus.COMPLETED)
+      completed: documents.filter((d) => d.status === DocumentStatus.PROCESSED)
         .length,
       processing: documents.filter(
         (d) =>
-          d.status === DocumentStatus.UPLOADING ||
+          d.status === DocumentStatus.UPLOADED ||
           d.status === DocumentStatus.PROCESSING,
       ).length,
       failed: documents.filter((d) => d.status === DocumentStatus.FAILED)

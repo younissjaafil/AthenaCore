@@ -1,5 +1,4 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { DocumentStatus, DocumentType } from '../entities/document.entity';
 
 export class DocumentResponseDto {
   @ApiProperty()
@@ -9,19 +8,13 @@ export class DocumentResponseDto {
   agentId: string;
 
   @ApiProperty()
-  userId: string;
-
-  @ApiProperty()
   filename: string;
 
   @ApiProperty()
-  originalName: string;
-
-  @ApiProperty({ enum: DocumentType })
-  type: DocumentType;
+  originalFilename: string;
 
   @ApiProperty()
-  mimeType: string;
+  fileType: string;
 
   @ApiProperty()
   fileSize: number;
@@ -29,23 +22,14 @@ export class DocumentResponseDto {
   @ApiPropertyOptional()
   s3Url?: string;
 
-  @ApiProperty({ enum: DocumentStatus })
-  status: DocumentStatus;
+  @ApiProperty()
+  status: string;
 
   @ApiProperty()
   chunkCount: number;
 
   @ApiProperty()
   embeddingCount: number;
-
-  @ApiPropertyOptional()
-  characterCount?: number;
-
-  @ApiPropertyOptional()
-  wordCount?: number;
-
-  @ApiPropertyOptional()
-  pageCount?: number;
 
   @ApiPropertyOptional()
   errorMessage?: string;
@@ -59,12 +43,6 @@ export class DocumentResponseDto {
     description?: string;
     [key: string]: any;
   };
-
-  @ApiPropertyOptional()
-  processingStartedAt?: Date;
-
-  @ApiPropertyOptional()
-  processingCompletedAt?: Date;
 
   @ApiProperty()
   createdAt: Date;

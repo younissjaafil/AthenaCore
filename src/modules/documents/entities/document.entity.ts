@@ -9,12 +9,11 @@ import {
   Index,
 } from 'typeorm';
 import { Agent } from '../../agents/entities/agent.entity';
-import { User } from '../../users/entities/user.entity';
 
 export enum DocumentStatus {
-  UPLOADING = 'uploading',
+  UPLOADED = 'uploaded',
   PROCESSING = 'processing',
-  COMPLETED = 'completed',
+  PROCESSED = 'processed',
   FAILED = 'failed',
 }
 
@@ -28,91 +27,59 @@ export enum DocumentType {
   JSON = 'json',
 }
 
-@Entity('documents')
+@Entity('document')
 @Index(['agentId', 'status'])
-@Index(['userId', 'createdAt'])
 export class Document {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column()
+  @Column({ name: 'agent_id' })
   @Index()
   agentId: string;
 
   @ManyToOne(() => Agent, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'agentId' })
+  @JoinColumn({ name: 'agent_id' })
   agent: Agent;
-
-  @Column()
-  @Index()
-  userId: string;
-
-  @ManyToOne(() => User, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'userId' })
-  user: User;
 
   // File Information
   @Column()
   filename: string;
 
-  @Column()
-  originalName: string;
+  @Column({ name: 'original_filename' })
+  originalFilename: string;
 
-  @Column({
-    type: 'enum',
-    enum: DocumentType,
-  })
-  type: DocumentType;
+  @Column({ name: 'file_type' })
+  fileType: string;
 
-  @Column()
-  mimeType: string;
-
-  @Column({ type: 'bigint' })
-  fileSize: number; // in bytes
+  @Column({ name: 'file_size', type: 'int' })
+  fileSize: number;
 
   // S3 Storage
-  @Column()
+  @Column({ name: 's3_key' })
   s3Key: string;
 
-  @Column()
-  s3Bucket: string;
-
-  @Column({ nullable: true })
+  @Column({ name: 's3_url', nullable: true })
   s3Url?: string;
 
   // Processing Information
   @Column({
-    type: 'enum',
-    enum: DocumentStatus,
-    default: DocumentStatus.UPLOADING,
+    default: DocumentStatus.UPLOADED,
   })
   @Index()
-  status: DocumentStatus;
+  status: string;
 
-  @Column({ type: 'int', default: 0 })
-  chunkCount: number; // Number of text chunks created
+  @Column({ name: 'extracted_text', type: 'text', nullable: true })
+  extractedText?: string;
 
-  @Column({ type: 'int', default: 0 })
-  embeddingCount: number; // Number of embeddings generated
+  @Column({ name: 'chunk_count', type: 'int', default: 0 })
+  chunkCount: number;
 
-  @Column({ type: 'text', nullable: true })
-  extractedText?: string; // Full extracted text
-
-  @Column({ type: 'int', nullable: true })
-  characterCount?: number;
-
-  @Column({ type: 'int', nullable: true })
-  wordCount?: number;
-
-  @Column({ type: 'int', nullable: true })
-  pageCount?: number;
+  @Column({ name: 'embedding_count', type: 'int', default: 0 })
+  embeddingCount: number;
 
   // Error Handling
-  @Column({ type: 'text', nullable: true })
+  @Column({ name: 'error_message', type: 'text', nullable: true })
   errorMessage?: string;
-
-  @Column({ type: 'int', default: 0 })
-  retryCount: number;
 
   // Metadata
   @Column({ type: 'jsonb', nullable: true })
@@ -125,16 +92,9 @@ export class Document {
     [key: string]: any;
   };
 
-  // Processing Timestamps
-  @Column({ type: 'timestamp', nullable: true })
-  processingStartedAt?: Date;
-
-  @Column({ type: 'timestamp', nullable: true })
-  processingCompletedAt?: Date;
-
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 }

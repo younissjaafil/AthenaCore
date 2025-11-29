@@ -10,7 +10,6 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
-  Query,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
@@ -22,6 +21,7 @@ import {
   ApiBody,
 } from '@nestjs/swagger';
 import { DocumentsService } from './documents.service';
+import { AgentsRepository } from '../agents/repositories/agents.repository';
 import { UploadDocumentDto } from './dto/upload-document.dto';
 import { DocumentResponseDto } from './dto/document-response.dto';
 import { ClerkAuthGuard } from '../auth/guards/clerk-auth.guard';
@@ -31,7 +31,10 @@ import { User } from '../users/entities/user.entity';
 @ApiTags('Documents')
 @Controller('documents')
 export class DocumentsController {
-  constructor(private readonly documentsService: DocumentsService) {}
+  constructor(
+    private readonly documentsService: DocumentsService,
+    private readonly agentsRepository: AgentsRepository,
+  ) {}
 
   @Post('upload')
   @UseGuards(ClerkAuthGuard)
@@ -91,7 +94,7 @@ export class DocumentsController {
   @Get('my-documents')
   @UseGuards(ClerkAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get my uploaded documents' })
+  @ApiOperation({ summary: 'Get documents from all my agents' })
   @ApiResponse({
     status: 200,
     description: 'User documents retrieved',
@@ -100,7 +103,10 @@ export class DocumentsController {
   async getMyDocuments(
     @CurrentUser() user: User,
   ): Promise<DocumentResponseDto[]> {
-    return this.documentsService.findByUser(user.id);
+    // Get documents from agents owned by this user
+    const agents = await this.agentsRepository.findByCreator(user.id);
+    const agentIds = agents.map((a) => a.id);
+    return this.documentsService.findByAgents(agentIds);
   }
 
   @Get('agent/:agentId/stats')
@@ -122,11 +128,8 @@ export class DocumentsController {
     description: 'Document found',
     type: DocumentResponseDto,
   })
-  async getDocument(
-    @Param('id') id: string,
-    @CurrentUser() user: User,
-  ): Promise<DocumentResponseDto> {
-    return this.documentsService.findOne(id, user.id);
+  async getDocument(@Param('id') id: string): Promise<DocumentResponseDto> {
+    return this.documentsService.findOne(id);
   }
 
   @Delete(':id')
@@ -139,6 +142,7 @@ export class DocumentsController {
     @Param('id') id: string,
     @CurrentUser() user: User,
   ): Promise<void> {
+    // User ID is used as creator ID to verify ownership via agent
     await this.documentsService.deleteDocument(id, user.id);
   }
 }

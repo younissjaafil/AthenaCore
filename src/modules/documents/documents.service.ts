@@ -76,14 +76,11 @@ export class DocumentsService {
     // Create document record
     const document = await this.documentsRepository.create({
       agentId: uploadDto.agentId,
-      userId,
       filename: file.originalname,
-      originalName: file.originalname,
-      type: docType,
-      mimeType: file.mimetype,
+      originalFilename: file.originalname,
+      fileType: docType,
       fileSize: file.size,
       s3Key,
-      s3Bucket: this.s3Service['bucketName'],
       s3Url,
       status: DocumentStatus.PROCESSING,
       metadata: {
@@ -151,22 +148,16 @@ export class DocumentsService {
       // Download file from S3
       const fileBuffer = await this.s3Service.getFile(document.s3Key);
 
-      // Extract text
-      const extractedText = await this.extractText(fileBuffer, document.type);
+      // Extract text based on file type
+      const extractedText = await this.extractText(
+        fileBuffer,
+        document.fileType as DocumentType,
+      );
 
-      // Calculate metrics
-      const characterCount = extractedText.length;
-      const wordCount = extractedText
-        .split(/\s+/)
-        .filter((w) => w.length > 0).length;
-
-      // Update document
+      // Update document with extracted text and mark as processed
       await this.documentsRepository.update(documentId, {
         extractedText,
-        characterCount,
-        wordCount,
-        status: DocumentStatus.COMPLETED,
-        processingCompletedAt: new Date(),
+        status: DocumentStatus.PROCESSED,
       });
 
       this.logger.log(`Document ${documentId} processed successfully`);
@@ -237,32 +228,36 @@ export class DocumentsService {
     return documents.map((doc) => this.toResponseDto(doc));
   }
 
-  async findByUser(userId: string): Promise<DocumentResponseDto[]> {
-    const documents = await this.documentsRepository.findByUser(userId);
+  async findByAgents(agentIds: string[]): Promise<DocumentResponseDto[]> {
+    const documents = await this.documentsRepository.findByAgentList(agentIds);
     return documents.map((doc) => this.toResponseDto(doc));
   }
 
-  async findOne(id: string, userId: string): Promise<DocumentResponseDto> {
+  async findOne(id: string, agentId?: string): Promise<DocumentResponseDto> {
     const document = await this.documentsRepository.findById(id);
     if (!document) {
       throw new NotFoundException('Document not found');
     }
 
-    if (document.userId !== userId) {
+    if (agentId && document.agentId !== agentId) {
       throw new ForbiddenException('You do not have access to this document');
     }
 
     return this.toResponseDto(document);
   }
 
-  async deleteDocument(id: string, userId: string): Promise<void> {
+  async deleteDocument(id: string, creatorId: string): Promise<void> {
     const document = await this.documentsRepository.findById(id);
     if (!document) {
       throw new NotFoundException('Document not found');
     }
 
-    if (document.userId !== userId) {
-      throw new ForbiddenException('You can only delete your own documents');
+    // Check if creator owns the agent
+    const agent = await this.agentsRepository.findById(document.agentId);
+    if (!agent || agent.creatorId !== creatorId) {
+      throw new ForbiddenException(
+        'You can only delete documents from your own agents',
+      );
     }
 
     // Delete from S3
@@ -283,23 +278,16 @@ export class DocumentsService {
     return {
       id: document.id,
       agentId: document.agentId,
-      userId: document.userId,
       filename: document.filename,
-      originalName: document.originalName,
-      type: document.type,
-      mimeType: document.mimeType,
+      originalFilename: document.originalFilename,
+      fileType: document.fileType,
       fileSize: Number(document.fileSize),
       s3Url: document.s3Url,
       status: document.status,
       chunkCount: document.chunkCount,
       embeddingCount: document.embeddingCount,
-      characterCount: document.characterCount,
-      wordCount: document.wordCount,
-      pageCount: document.pageCount,
       errorMessage: document.errorMessage,
       metadata: document.metadata,
-      processingStartedAt: document.processingStartedAt,
-      processingCompletedAt: document.processingCompletedAt,
       createdAt: document.createdAt,
       updatedAt: document.updatedAt,
     };
