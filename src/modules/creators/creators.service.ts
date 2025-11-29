@@ -31,23 +31,22 @@ export class CreatorsService {
     // Check if creator profile already exists
     const existing = await this.creatorsRepository.findByUserId(userId);
     if (existing) {
-      throw new ConflictException(
-        'Creator profile already exists for this user',
-      );
+      // Return existing creator instead of throwing error
+      return this.toResponseDto(existing);
     }
 
-    // Create creator profile
+    // Create creator profile with active status for v1
     const creator = await this.creatorsRepository.create({
       userId,
       ...createCreatorDto,
+      status: 'active' as any, // Set to active for v1, no approval needed
     });
 
-    // Assign CREATOR role to user if not already assigned
-    if (user.role !== UserRole.CREATOR) {
-      await this.usersService.update(userId, {
-        role: UserRole.CREATOR,
-      });
-    }
+    // Assign CREATOR role and mark onboarding as complete
+    await this.usersService.update(userId, {
+      role: UserRole.CREATOR,
+      hasCompletedOnboarding: true,
+    });
 
     return this.toResponseDto(creator);
   }

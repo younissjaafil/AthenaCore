@@ -8,6 +8,7 @@ import {
   Body,
   Query,
   UseGuards,
+  ForbiddenException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -20,6 +21,7 @@ import { AdminService } from './admin.service';
 import { ClerkAuthGuard } from '../auth/guards/clerk-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { UserRole } from '../../common/constants/roles.enum';
 import {
   SystemStatsDto,
@@ -32,13 +34,39 @@ import { UpdateUserRoleDto, DeactivateUserDto } from './dto/update-user.dto';
 
 @ApiTags('Admin')
 @Controller('admin')
-@UseGuards(ClerkAuthGuard, RolesGuard)
-@Roles(UserRole.ADMIN)
 @ApiBearerAuth()
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}
 
+  @Get('me')
+  @UseGuards(ClerkAuthGuard)
+  @ApiOperation({ summary: 'Check if current user is admin' })
+  @ApiResponse({
+    status: 200,
+    description: 'User is admin',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'User is not admin',
+  })
+  async checkAdmin(@CurrentUser() user: any): Promise<any> {
+    // This will throw if user is not admin
+    if (!user.isAdmin) {
+      throw new ForbiddenException('Not authorized as admin');
+    }
+    return {
+      isAdmin: true,
+      user: {
+        id: user.id,
+        email: user.email,
+        fullName: user.fullName,
+      },
+    };
+  }
+
   @Get('stats/system')
+  @UseGuards(ClerkAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Get comprehensive system statistics' })
   @ApiResponse({
     status: 200,

@@ -35,14 +35,44 @@ export class UsersController {
   @Get('me')
   @UseGuards(ClerkAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get current user profile' })
+  @ApiOperation({ summary: 'Get current user profile (creates if not exists)' })
   @ApiResponse({
     status: 200,
     description: 'Current user profile',
     type: UserResponseDto,
   })
-  async getMe(@CurrentUser() user: User): Promise<UserResponseDto> {
+  async getMe(@CurrentUser() clerkUser: any): Promise<UserResponseDto> {
+    // Find or create user based on Clerk data
+    const user = await this.usersService.findOrCreate({
+      sub: clerkUser.sub || clerkUser.clerkId,
+      email: clerkUser.email,
+      firstName: clerkUser.firstName,
+      lastName: clerkUser.lastName,
+    });
     return this.usersService.toResponseDto(user);
+  }
+
+  @Patch('me')
+  @UseGuards(ClerkAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update current user profile' })
+  @ApiResponse({
+    status: 200,
+    description: 'User profile updated',
+    type: UserResponseDto,
+  })
+  async updateMe(
+    @CurrentUser() clerkUser: any,
+    @Body() updateUserDto: UpdateUserDto,
+  ): Promise<UserResponseDto> {
+    // Find user by clerkId
+    const user = await this.usersService.findByClerkId(
+      clerkUser.sub || clerkUser.clerkId,
+    );
+
+    // Update user
+    const updated = await this.usersService.update(user.id, updateUserDto);
+    return this.usersService.toResponseDto(updated);
   }
 
   @Get()

@@ -60,3 +60,7 @@ test-infrastructure.ts
 CONVERSATIONS_API.md
 
 enable-pgvector.ts
+
+migrations
+
+PHASE1_ONBOARDING.md

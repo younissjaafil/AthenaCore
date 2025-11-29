@@ -33,16 +33,31 @@ import { Public } from '../../common/decorators/public.decorator';
 export class CreatorsController {
   constructor(private readonly creatorsService: CreatorsService) {}
 
+  @Get('me')
+  @UseGuards(ClerkAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get current user creator profile' })
+  @ApiResponse({
+    status: 200,
+    description: 'Creator profile retrieved',
+    type: CreatorResponseDto,
+  })
+  @ApiResponse({ status: 404, description: 'Creator profile not found' })
+  async getMyProfile(
+    @CurrentUser() user: User,
+  ): Promise<CreatorResponseDto | null> {
+    return this.creatorsService.findByUserId(user.id);
+  }
+
   @Post()
   @UseGuards(ClerkAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Create creator profile' })
+  @ApiOperation({ summary: 'Create creator profile (idempotent)' })
   @ApiResponse({
     status: 201,
-    description: 'Creator profile created',
+    description: 'Creator profile created or retrieved',
     type: CreatorResponseDto,
   })
-  @ApiResponse({ status: 409, description: 'Creator profile already exists' })
   async create(
     @CurrentUser() user: User,
     @Body() createCreatorDto: CreateCreatorDto,
@@ -72,22 +87,6 @@ export class CreatorsController {
   })
   async findAvailable(): Promise<CreatorResponseDto[]> {
     return this.creatorsService.findAvailable();
-  }
-
-  @Get('me')
-  @UseGuards(ClerkAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get current user creator profile' })
-  @ApiResponse({
-    status: 200,
-    description: 'Creator profile',
-    type: CreatorResponseDto,
-  })
-  @ApiResponse({ status: 404, description: 'Creator profile not found' })
-  async getMyProfile(
-    @CurrentUser() user: User,
-  ): Promise<CreatorResponseDto | null> {
-    return this.creatorsService.findByUserId(user.id);
   }
 
   @Get(':id')

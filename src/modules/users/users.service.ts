@@ -74,6 +74,37 @@ export class UsersService {
     }
   }
 
+  async findOrCreate(clerkUserData: {
+    sub: string;
+    email: string;
+    firstName?: string;
+    lastName?: string;
+  }): Promise<User> {
+    // Try to find existing user by clerkId
+    const existingUser = await this.usersRepository.findByClerkId(
+      clerkUserData.sub,
+    );
+
+    if (existingUser) {
+      return existingUser;
+    }
+
+    // Create new user if not found
+    const name = [clerkUserData.firstName, clerkUserData.lastName]
+      .filter(Boolean)
+      .join(' ')
+      .trim();
+
+    return this.usersRepository.create({
+      clerkId: clerkUserData.sub,
+      email: clerkUserData.email,
+      firstName: clerkUserData.firstName,
+      lastName: clerkUserData.lastName,
+      isAdmin: false,
+      hasCompletedOnboarding: false,
+    });
+  }
+
   async syncFromClerk(clerkUserData: any): Promise<User> {
     const existingUser = await this.usersRepository.findByClerkId(
       clerkUserData.id,

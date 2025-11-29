@@ -10,10 +10,17 @@ import {
   Min,
   MaxLength,
 } from 'class-validator';
-import { ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ExpertiseLevel } from '../entities/creator.entity';
 
 export class CreateCreatorDto {
+  @ApiProperty({
+    description: 'Creator title/role (e.g., "AI Expert", "Math Tutor")',
+  })
+  @IsString()
+  @MaxLength(200)
+  title: string;
+
   @ApiPropertyOptional({ description: 'Creator bio/description' })
   @IsOptional()
   @IsString()

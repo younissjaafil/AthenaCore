@@ -23,6 +23,14 @@ A comprehensive NestJS monolith architecture for the Athena v1 AI agent platform
 - ✅ JWT validation strategy
 - ✅ Global authentication guard with @Public() decorator support
 - ✅ User service with CRUD operations
+- ✅ **Phase 1 Onboarding Implementation**
+  - Auto-create user on first login via `GET /users/me`
+  - `hasCompletedOnboarding` flag for onboarding flow
+  - `isAdmin` flag for admin access control
+  - `PATCH /users/me` for updating onboarding status
+  - `GET /creators/me` to check creator profile status
+  - `POST /creators` for creator profile creation (idempotent)
+  - `GET /admin/me` for admin status verification
 
 ### Phase 3: Feature Modules ✅
 
@@ -68,6 +76,7 @@ A comprehensive NestJS monolith architecture for the Athena v1 AI agent platform
   - User, creator, and agent management
   - Role-based access control
   - Deactivation and reactivation
+  - Admin status verification endpoint (`GET /admin/me`)
 
 ## 🧠 RAG Architecture
 
@@ -233,12 +242,17 @@ Swagger documentation is available at: `http://localhost:3000/docs`
 #### 👤 Users Module
 
 - Internal user representation
-- Profile management
-- Link to external auth providers
+- Profile management with auto-creation on first login
+- Link to external auth providers (Clerk)
+- Onboarding status tracking with `hasCompletedOnboarding` flag
+- Admin flag for access control
 
 #### 🎨 Creators Module
 
-- Creator profiles
+- Creator profiles with title and bio
+- Idempotent profile creation (returns existing if already created)
+- Automatic user role assignment (CREATOR)
+- Automatic onboarding completion on profile creation
 - Payout information
 - Creator statistics
 
@@ -563,12 +577,19 @@ npm run typeorm migration:revert
 **Authentication & Users:**
 
 - `POST /api/auth/webhook` - Clerk webhook handler ✅
-- `GET /api/users/me` - Current user profile ✅
+- `GET /api/users/me` - Current user profile (auto-creates on first login) ✅
+- `PATCH /api/users/me` - Update user profile (onboarding flag) ✅
 - `GET /api/users/:id` - Get user by ID ✅
+
+**Admin:**
+
+- `GET /api/admin/me` - Check if current user is admin ✅
+- `GET /api/admin/stats/system` - Get system-wide statistics ✅
 
 **Creators:**
 
-- `POST /api/creators` - Create creator profile ✅
+- `GET /api/creators/me` - Get current user's creator profile ✅
+- `POST /api/creators` - Create creator profile (idempotent) ✅
 - `GET /api/creators` - List all creators ✅
 - `GET /api/creators/:id` - Get creator details ✅
 - `PATCH /api/creators/:id` - Update creator profile ✅
@@ -633,6 +654,7 @@ npm run typeorm migration:revert
 
 **Admin:**
 
+- `GET /api/admin/me` - Check if current user is admin ✅
 - `GET /api/admin/stats/system` - Get system-wide statistics ✅
 - `GET /api/admin/stats/user/:userId` - Get user statistics ✅
 - `GET /api/admin/stats/creator/:creatorId` - Get creator statistics ✅

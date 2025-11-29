@@ -34,6 +34,9 @@ export class Creator {
   @JoinColumn({ name: 'userId' })
   user: User;
 
+  @Column({ type: 'varchar', length: 200 })
+  title: string;
+
   @Column({ type: 'text', nullable: true })
   bio: string;
 

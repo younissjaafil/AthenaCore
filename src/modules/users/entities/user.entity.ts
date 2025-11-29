@@ -37,6 +37,12 @@ export class User {
   })
   role: UserRole;
 
+  @Column({ default: false })
+  isAdmin: boolean;
+
+  @Column({ default: false })
+  hasCompletedOnboarding: boolean;
+
   @Column({ default: true })
   isActive: boolean;
 
