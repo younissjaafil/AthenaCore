@@ -38,37 +38,25 @@ export class VectorSearchService {
     limit: number = 5,
     threshold: number = 0.7,
   ): Promise<SearchResult[]> {
-    this.logger.log(
-      `RAG Search - Agent: ${agentId}, Query: "${query.substring(0, 50)}...", Limit: ${limit}, Threshold: ${threshold}`,
-    );
-
     // Check cache first
     const cacheKey = this.getCacheKey(agentId, query, limit, threshold);
     const cached = await this.cacheManager.get<SearchResult[]>(cacheKey);
     if (cached) {
-      this.logger.log(
-        `Cache hit for query - returning ${cached.length} cached results`,
-      );
+      this.logger.log(`RAG cache hit: ${cached.length} results`);
       return cached;
     }
 
     // Generate query embedding
-    this.logger.log('Generating query embedding...');
     const queryVector =
       await this.embeddingsService.generateQueryEmbedding(query);
-    this.logger.log(
-      `Query embedding generated, vector length: ${queryVector.length}`,
-    );
 
     // Perform similarity search
-    this.logger.log('Searching Qdrant...');
     const results = await this.embeddingsRepository.similaritySearch(
       agentId,
       queryVector,
       limit,
       threshold,
     );
-    this.logger.log(`Qdrant returned ${results.length} results`);
 
     // Map results
     const searchResults: SearchResult[] = results.map((result) => ({
@@ -85,9 +73,7 @@ export class VectorSearchService {
 
     // Cache results
     await this.cacheManager.set(cacheKey, searchResults, this.cacheTTL);
-    this.logger.log(
-      `Found ${searchResults.length} results with similarity >= ${threshold}`,
-    );
+    this.logger.log(`RAG search: ${searchResults.length} chunks retrieved`);
 
     return searchResults;
   }

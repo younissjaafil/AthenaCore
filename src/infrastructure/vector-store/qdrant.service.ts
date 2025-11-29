@@ -104,30 +104,6 @@ export class QdrantService implements OnModuleInit {
     scoreThreshold: number = 0.7,
   ): Promise<SearchResult[]> {
     try {
-      this.logger.log(
-        `Qdrant search - Collection: ${this.collectionName}, AgentId: ${agentId}, Limit: ${limit}, Threshold: ${scoreThreshold}`,
-      );
-
-      // First, check collection info
-      try {
-        const collectionInfo = await this.client.getCollection(this.collectionName);
-        this.logger.log(`Collection has ${collectionInfo.points_count} total points`);
-      } catch (e) {
-        this.logger.warn('Could not get collection info');
-      }
-
-      // Try search WITHOUT filter first to see if we get any results
-      const unfilteredResults = await this.client.search(this.collectionName, {
-        vector: queryVector,
-        limit: 3,
-        with_payload: true,
-      });
-      this.logger.log(`Unfiltered search found ${unfilteredResults.length} results`);
-      if (unfilteredResults.length > 0) {
-        this.logger.log(`Unfiltered top result agentId: ${(unfilteredResults[0].payload as any)?.agentId}, score: ${unfilteredResults[0].score}`);
-      }
-
-      // Now search WITH filter
       const results = await this.client.search(this.collectionName, {
         vector: queryVector,
         limit,
@@ -143,13 +119,9 @@ export class QdrantService implements OnModuleInit {
         with_payload: true,
       });
 
-      this.logger.log(`Filtered search found ${results.length} matching vectors`);
-
-      if (results.length > 0) {
-        this.logger.log(
-          `Top result - Score: ${results[0].score}, ID: ${results[0].id}`,
-        );
-      }
+      this.logger.log(
+        `Qdrant: Found ${results.length} vectors (threshold: ${scoreThreshold})`,
+      );
 
       return results.map((r) => ({
         id: r.id as string,

@@ -249,19 +249,16 @@ export class ConversationsService {
     // Get RAG context if enabled
     if (useRag) {
       try {
-        this.logger.log(
-          `RAG search for agent ${conversation.agentId}: "${userQuery.substring(0, 50)}..."`,
-        );
-
+        // Retrieve more chunks for comprehensive context
         const searchResults = await this.vectorSearchService.search(
           conversation.agentId,
           userQuery,
-          5,
-          0.5, // Lowered threshold for better recall
+          10, // Get more chunks for better coverage
+          0.4, // Lower threshold to include more relevant content
         );
 
         this.logger.log(
-          `RAG search returned ${searchResults.length} results for agent ${conversation.agentId}`,
+          `RAG: Found ${searchResults.length} relevant chunks for query`,
         );
 
         if (searchResults.length > 0) {
@@ -353,7 +350,7 @@ export class ConversationsService {
       agent.systemPrompt || `You are ${agent.name}, a helpful AI assistant.`;
 
     if (ragContext) {
-      prompt += `\n\n## Knowledge Base Context\n\nUse the following context from the knowledge base to answer the user's question. If the context doesn't contain relevant information, acknowledge this and provide a general response based on your knowledge.\n\n${ragContext}`;
+      prompt += `\n\n## IMPORTANT: Knowledge Base Context\n\nYou have access to the following information from uploaded documents. Use ALL relevant information from this context to provide comprehensive, detailed answers. Include specific details, names, dates, skills, and experiences mentioned in the context.\n\n${ragContext}\n\n## Instructions\n- Prioritize information from the context above over your general knowledge\n- Include specific details and examples from the context\n- If the context contains relevant information, use it fully\n- Only say you don't have information if it's truly not in the context`;
     }
 
     return prompt;
