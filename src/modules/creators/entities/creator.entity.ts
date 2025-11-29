@@ -27,11 +27,11 @@ export class Creator {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'uuid' })
+  @Column({ name: 'user_id', type: 'uuid' })
   userId: string;
 
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'userId' })
+  @JoinColumn({ name: 'user_id' })
   user: User;
 
   @Column({ type: 'varchar', length: 200 })
@@ -50,6 +50,7 @@ export class Creator {
   categories: string[];
 
   @Column({
+    name: 'expertise_level',
     type: 'enum',
     enum: ExpertiseLevel,
     default: ExpertiseLevel.BEGINNER,
@@ -57,23 +58,35 @@ export class Creator {
   expertiseLevel: ExpertiseLevel;
 
   // Pricing
-  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  @Column({
+    name: 'hourly_rate',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    default: 0,
+  })
   hourlyRate: number;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  @Column({
+    name: 'minimum_booking',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    default: 0,
+  })
   minimumBooking: number;
 
   // Social Links
-  @Column({ type: 'varchar', nullable: true })
+  @Column({ name: 'website_url', type: 'varchar', nullable: true })
   websiteUrl: string;
 
-  @Column({ type: 'varchar', nullable: true })
+  @Column({ name: 'linkedin_url', type: 'varchar', nullable: true })
   linkedinUrl: string;
 
-  @Column({ type: 'varchar', nullable: true })
+  @Column({ name: 'twitter_url', type: 'varchar', nullable: true })
   twitterUrl: string;
 
-  @Column({ type: 'varchar', nullable: true })
+  @Column({ name: 'github_url', type: 'varchar', nullable: true })
   githubUrl: string;
 
   // Verification & Status
@@ -84,41 +97,34 @@ export class Creator {
   })
   status: CreatorStatus;
 
-  @Column({ type: 'boolean', default: false })
+  @Column({ name: 'is_available', type: 'boolean', default: false })
   isAvailable: boolean;
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ name: 'verification_notes', type: 'text', nullable: true })
   verificationNotes: string;
 
   // Statistics
-  @Column({ type: 'int', default: 0 })
+  @Column({ name: 'total_agents', type: 'int', default: 0 })
   totalAgents: number;
 
-  @Column({ type: 'int', default: 0 })
+  @Column({ name: 'total_sessions', type: 'int', default: 0 })
   totalSessions: number;
 
-  @Column({ type: 'decimal', precision: 3, scale: 2, default: 0 })
+  @Column({
+    name: 'average_rating',
+    type: 'decimal',
+    precision: 3,
+    scale: 2,
+    default: 0,
+  })
   averageRating: number;
 
-  @Column({ type: 'int', default: 0 })
+  @Column({ name: 'total_reviews', type: 'int', default: 0 })
   totalReviews: number;
 
-  @Column({ type: 'decimal', precision: 12, scale: 2, default: 0 })
-  totalEarnings: number;
-
-  // Payout Information
-  @Column({ type: 'varchar', nullable: true })
-  payoutEmail: string;
-
-  @Column({ type: 'varchar', nullable: true })
-  payoutMethod: string; // 'stripe', 'paypal', 'whish', etc.
-
-  @Column({ type: 'jsonb', nullable: true })
-  payoutDetails: Record<string, any>;
-
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 }

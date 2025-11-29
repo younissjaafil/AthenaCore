@@ -60,15 +60,6 @@ export class CreatorResponseDto {
   totalReviews: number;
 
   @ApiProperty()
-  totalEarnings: number;
-
-  @ApiPropertyOptional()
-  payoutEmail?: string;
-
-  @ApiPropertyOptional()
-  payoutMethod?: string;
-
-  @ApiProperty()
   createdAt: Date;
 
   @ApiProperty()

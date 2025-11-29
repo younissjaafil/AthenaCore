@@ -124,9 +124,6 @@ export class CreatorsService {
       totalSessions: creator.totalSessions,
       averageRating: Number(creator.averageRating),
       totalReviews: creator.totalReviews,
-      totalEarnings: Number(creator.totalEarnings),
-      payoutEmail: creator.payoutEmail,
-      payoutMethod: creator.payoutMethod,
       createdAt: creator.createdAt,
       updatedAt: creator.updatedAt,
     };
