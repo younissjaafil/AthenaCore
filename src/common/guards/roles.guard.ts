@@ -18,6 +18,23 @@ export class RolesGuard implements CanActivate {
     }
 
     const { user } = context.switchToHttp().getRequest();
-    return requiredRoles.some((role) => user?.roles?.includes(role));
+
+    // Check if user has any of the required roles
+    // User has a single 'role' field, not an array
+    if (!user) {
+      return false;
+    }
+
+    // Check single role field
+    if (requiredRoles.includes(user.role)) {
+      return true;
+    }
+
+    // Also check isAdmin for admin-only endpoints
+    if (requiredRoles.includes(UserRole.ADMIN) && user.isAdmin) {
+      return true;
+    }
+
+    return false;
   }
 }
