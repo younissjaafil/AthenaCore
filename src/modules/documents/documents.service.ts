@@ -93,9 +93,6 @@ export class DocumentsService {
       },
     });
 
-    // Increment agent document count
-    await this.agentsRepository.incrementDocumentCount(uploadDto.agentId);
-
     // Start async processing
     this.processDocumentAsync(document.id).catch((error) => {
       this.logger.error(

@@ -1,9 +1,4 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import {
-  AIModel,
-  AgentVisibility,
-  AgentStatus,
-} from '../entities/agent.entity';
 
 export class AgentResponseDto {
   @ApiProperty()
@@ -16,19 +11,13 @@ export class AgentResponseDto {
   name: string;
 
   @ApiPropertyOptional()
-  tagline?: string;
-
-  @ApiProperty()
-  description: string;
+  description?: string;
 
   @ApiProperty()
   systemPrompt: string;
 
-  @ApiPropertyOptional()
-  welcomeMessage?: string;
-
-  @ApiProperty({ enum: AIModel })
-  model: AIModel;
+  @ApiProperty()
+  model: string;
 
   @ApiProperty()
   temperature: number;
@@ -36,17 +25,8 @@ export class AgentResponseDto {
   @ApiProperty()
   maxTokens: number;
 
-  @ApiProperty()
-  topP: number;
-
-  @ApiProperty()
-  frequencyPenalty: number;
-
-  @ApiProperty()
-  presencePenalty: number;
-
-  @ApiProperty()
-  category: string;
+  @ApiProperty({ type: [String] })
+  category: string[];
 
   @ApiProperty({ type: [String] })
   tags: string[];
@@ -55,31 +35,31 @@ export class AgentResponseDto {
   pricePerMessage: number;
 
   @ApiProperty()
-  pricePerMonth: number;
+  pricePerConversation: number;
 
   @ApiProperty()
   isFree: boolean;
 
-  @ApiProperty({ enum: AgentVisibility })
-  visibility: AgentVisibility;
-
-  @ApiProperty({ enum: AgentStatus })
-  status: AgentStatus;
-
-  @ApiPropertyOptional()
-  avatarUrl?: string;
-
-  @ApiPropertyOptional()
-  coverImageUrl?: string;
+  @ApiProperty()
+  isPublic: boolean;
 
   @ApiProperty()
-  ragEnabled: boolean;
+  status: string;
+
+  @ApiPropertyOptional()
+  profileImageUrl?: string;
 
   @ApiProperty()
-  ragContextSize: number;
+  useRag: boolean;
 
   @ApiProperty()
   ragSimilarityThreshold: number;
+
+  @ApiProperty()
+  ragMaxResults: number;
+
+  @ApiProperty()
+  ragMaxTokens: number;
 
   @ApiProperty()
   totalConversations: number;
@@ -89,12 +69,6 @@ export class AgentResponseDto {
 
   @ApiProperty()
   averageRating: number;
-
-  @ApiProperty()
-  totalReviews: number;
-
-  @ApiProperty()
-  totalDocuments: number;
 
   @ApiProperty()
   createdAt: Date;

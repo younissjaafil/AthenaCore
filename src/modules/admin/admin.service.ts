@@ -233,7 +233,7 @@ export class AdminService {
       documentCount,
       embeddingCount,
       totalRevenue,
-      visibility: agent.visibility,
+      isPublic: agent.isPublic,
       createdAt: agent.createdAt,
     };
   }

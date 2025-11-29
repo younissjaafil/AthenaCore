@@ -314,7 +314,7 @@ export class ConversationsService {
    */
   private buildSystemPrompt(agent: Agent, ragContext: string): string {
     let prompt =
-      agent.systemPrompt || `You are ${agent.name}, ${agent.tagline}`;
+      agent.systemPrompt || `You are ${agent.name}, a helpful AI assistant.`;
 
     if (ragContext) {
       prompt += `\n\n## Knowledge Base Context\n\nUse the following context from the knowledge base to answer the user's question. If the context doesn't contain relevant information, acknowledge this and provide a general response based on your knowledge.\n\n${ragContext}`;
@@ -364,7 +364,7 @@ export class ConversationsService {
         ? {
             id: conversation.agent.id,
             name: conversation.agent.name,
-            tagline: conversation.agent.tagline || '',
+            tagline: conversation.agent.description || '',
           }
         : undefined,
       createdAt: conversation.createdAt,

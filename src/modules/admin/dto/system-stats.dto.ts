@@ -160,8 +160,8 @@ export class AgentStatsDto {
   })
   totalRevenue: number;
 
-  @ApiProperty({ description: 'Visibility status', example: 'public' })
-  visibility: string;
+  @ApiProperty({ description: 'Public visibility status', example: true })
+  isPublic: boolean;
 
   @ApiProperty({ description: 'Created date' })
   createdAt: Date;

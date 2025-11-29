@@ -36,123 +36,116 @@ export class Agent {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'uuid' })
+  @Column({ name: 'creator_id', type: 'uuid' })
   creatorId: string;
 
   @ManyToOne(() => Creator, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'creatorId' })
+  @JoinColumn({ name: 'creator_id' })
   creator: Creator;
 
   @Column({ type: 'varchar', length: 200 })
   name: string;
 
-  @Column({ type: 'varchar', length: 500, nullable: true })
-  tagline: string;
-
-  @Column({ type: 'text' })
+  @Column({ type: 'text', nullable: true })
   description: string;
 
-  @Column({ type: 'text' })
+  @Column({ name: 'system_prompt', type: 'text' })
   systemPrompt: string;
-
-  @Column({ type: 'text', nullable: true })
-  welcomeMessage: string;
 
   // AI Configuration
   @Column({
-    type: 'enum',
-    enum: AIModel,
-    default: AIModel.GPT_35_TURBO,
+    type: 'varchar',
+    default: 'gpt-4',
   })
-  model: AIModel;
+  model: string;
 
-  @Column({ type: 'float', default: 0.7 })
+  @Column({ type: 'decimal', precision: 3, scale: 2, default: 0.7 })
   temperature: number;
 
-  @Column({ type: 'int', default: 2000 })
+  @Column({ name: 'max_tokens', type: 'int', default: 2000 })
   maxTokens: number;
 
-  @Column({ type: 'float', default: 0.9 })
-  topP: number;
-
-  @Column({ type: 'float', default: 0 })
-  frequencyPenalty: number;
-
-  @Column({ type: 'float', default: 0 })
-  presencePenalty: number;
-
-  // Categorization
-  @Column({ type: 'varchar', length: 100 })
-  category: string;
+  // Categorization - stored as array in DB
+  @Column({ type: 'varchar', array: true, default: [] })
+  category: string[];
 
   @Column({ type: 'varchar', array: true, default: [] })
   tags: string[];
 
   // Pricing
-  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  @Column({
+    name: 'price_per_message',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    default: 0,
+  })
   pricePerMessage: number;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
-  pricePerMonth: number;
+  @Column({
+    name: 'price_per_conversation',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    default: 0,
+  })
+  pricePerConversation: number;
 
-  @Column({ type: 'boolean', default: true })
+  @Column({ name: 'is_free', type: 'boolean', default: false })
   isFree: boolean;
 
-  // Visibility & Status
-  @Column({
-    type: 'enum',
-    enum: AgentVisibility,
-    default: AgentVisibility.PRIVATE,
-  })
-  visibility: AgentVisibility;
+  @Column({ name: 'is_public', type: 'boolean', default: false })
+  isPublic: boolean;
 
+  // Status
   @Column({
-    type: 'enum',
-    enum: AgentStatus,
-    default: AgentStatus.DRAFT,
+    type: 'varchar',
+    default: 'draft',
   })
-  status: AgentStatus;
+  status: string;
 
   // Media
-  @Column({ type: 'varchar', nullable: true })
-  avatarUrl: string;
-
-  @Column({ type: 'varchar', nullable: true })
-  coverImageUrl: string;
+  @Column({ name: 'profile_image_url', type: 'varchar', nullable: true })
+  profileImageUrl: string;
 
   // RAG Configuration
-  @Column({ type: 'boolean', default: false })
-  ragEnabled: boolean;
+  @Column({ name: 'use_rag', type: 'boolean', default: true })
+  useRag: boolean;
 
-  @Column({ type: 'int', default: 5 })
-  ragContextSize: number;
-
-  @Column({ type: 'float', default: 0.7 })
+  @Column({
+    name: 'rag_similarity_threshold',
+    type: 'decimal',
+    precision: 3,
+    scale: 2,
+    default: 0.7,
+  })
   ragSimilarityThreshold: number;
 
+  @Column({ name: 'rag_max_results', type: 'int', default: 5 })
+  ragMaxResults: number;
+
+  @Column({ name: 'rag_max_tokens', type: 'int', default: 3000 })
+  ragMaxTokens: number;
+
   // Statistics
-  @Column({ type: 'int', default: 0 })
+  @Column({ name: 'total_conversations', type: 'int', default: 0 })
   totalConversations: number;
 
-  @Column({ type: 'int', default: 0 })
+  @Column({ name: 'total_messages', type: 'int', default: 0 })
   totalMessages: number;
 
-  @Column({ type: 'decimal', precision: 3, scale: 2, default: 0 })
+  @Column({
+    name: 'average_rating',
+    type: 'decimal',
+    precision: 3,
+    scale: 2,
+    default: 0,
+  })
   averageRating: number;
 
-  @Column({ type: 'int', default: 0 })
-  totalReviews: number;
-
-  @Column({ type: 'int', default: 0 })
-  totalDocuments: number;
-
-  // Metadata
-  @Column({ type: 'jsonb', nullable: true })
-  metadata: Record<string, any>;
-
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 }

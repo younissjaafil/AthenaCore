@@ -2,7 +2,6 @@ import {
   IsString,
   IsOptional,
   IsArray,
-  IsEnum,
   IsNumber,
   IsBoolean,
   Min,
@@ -11,11 +10,6 @@ import {
   IsUrl,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import {
-  AIModel,
-  AgentVisibility,
-  AgentStatus,
-} from '../entities/agent.entity';
 
 export class CreateAgentDto {
   @ApiProperty({ description: 'Agent name', maxLength: 200 })
@@ -23,29 +17,19 @@ export class CreateAgentDto {
   @MaxLength(200)
   name: string;
 
-  @ApiPropertyOptional({ description: 'Short tagline', maxLength: 500 })
+  @ApiPropertyOptional({ description: 'Agent description' })
   @IsOptional()
   @IsString()
-  @MaxLength(500)
-  tagline?: string;
-
-  @ApiProperty({ description: 'Agent description' })
-  @IsString()
-  description: string;
+  description?: string;
 
   @ApiProperty({ description: 'System prompt for the AI' })
   @IsString()
   systemPrompt: string;
 
-  @ApiPropertyOptional({ description: 'Welcome message for users' })
+  @ApiPropertyOptional({ description: 'AI model to use' })
   @IsOptional()
   @IsString()
-  welcomeMessage?: string;
-
-  @ApiPropertyOptional({ description: 'AI model to use', enum: AIModel })
-  @IsOptional()
-  @IsEnum(AIModel)
-  model?: AIModel;
+  model?: string;
 
   @ApiPropertyOptional({
     description: 'Temperature (0-2)',
@@ -64,39 +48,11 @@ export class CreateAgentDto {
   @Min(1)
   maxTokens?: number;
 
-  @ApiPropertyOptional({ description: 'Top P (0-1)', minimum: 0, maximum: 1 })
+  @ApiPropertyOptional({ description: 'Agent categories', type: [String] })
   @IsOptional()
-  @IsNumber()
-  @Min(0)
-  @Max(1)
-  topP?: number;
-
-  @ApiPropertyOptional({
-    description: 'Frequency penalty (-2 to 2)',
-    minimum: -2,
-    maximum: 2,
-  })
-  @IsOptional()
-  @IsNumber()
-  @Min(-2)
-  @Max(2)
-  frequencyPenalty?: number;
-
-  @ApiPropertyOptional({
-    description: 'Presence penalty (-2 to 2)',
-    minimum: -2,
-    maximum: 2,
-  })
-  @IsOptional()
-  @IsNumber()
-  @Min(-2)
-  @Max(2)
-  presencePenalty?: number;
-
-  @ApiProperty({ description: 'Agent category' })
-  @IsString()
-  @MaxLength(100)
-  category: string;
+  @IsArray()
+  @IsString({ each: true })
+  category?: string[];
 
   @ApiPropertyOptional({ description: 'Tags', type: [String] })
   @IsOptional()
@@ -110,51 +66,36 @@ export class CreateAgentDto {
   @Min(0)
   pricePerMessage?: number;
 
-  @ApiPropertyOptional({ description: 'Monthly subscription price in USD' })
+  @ApiPropertyOptional({ description: 'Price per conversation in USD' })
   @IsOptional()
   @IsNumber()
   @Min(0)
-  pricePerMonth?: number;
+  pricePerConversation?: number;
 
   @ApiPropertyOptional({ description: 'Is agent free to use' })
   @IsOptional()
   @IsBoolean()
   isFree?: boolean;
 
-  @ApiPropertyOptional({
-    description: 'Agent visibility',
-    enum: AgentVisibility,
-  })
+  @ApiPropertyOptional({ description: 'Is agent public' })
   @IsOptional()
-  @IsEnum(AgentVisibility)
-  visibility?: AgentVisibility;
+  @IsBoolean()
+  isPublic?: boolean;
 
-  @ApiPropertyOptional({ description: 'Agent status', enum: AgentStatus })
+  @ApiPropertyOptional({ description: 'Agent status' })
   @IsOptional()
-  @IsEnum(AgentStatus)
-  status?: AgentStatus;
+  @IsString()
+  status?: string;
 
-  @ApiPropertyOptional({ description: 'Avatar URL' })
+  @ApiPropertyOptional({ description: 'Profile image URL' })
   @IsOptional()
   @IsUrl()
-  avatarUrl?: string;
-
-  @ApiPropertyOptional({ description: 'Cover image URL' })
-  @IsOptional()
-  @IsUrl()
-  coverImageUrl?: string;
+  profileImageUrl?: string;
 
   @ApiPropertyOptional({ description: 'Enable RAG for this agent' })
   @IsOptional()
   @IsBoolean()
-  ragEnabled?: boolean;
-
-  @ApiPropertyOptional({ description: 'Number of context chunks for RAG' })
-  @IsOptional()
-  @IsNumber()
-  @Min(1)
-  @Max(20)
-  ragContextSize?: number;
+  useRag?: boolean;
 
   @ApiPropertyOptional({ description: 'Similarity threshold for RAG (0-1)' })
   @IsOptional()
@@ -162,4 +103,17 @@ export class CreateAgentDto {
   @Min(0)
   @Max(1)
   ragSimilarityThreshold?: number;
+
+  @ApiPropertyOptional({ description: 'Max results for RAG' })
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Max(20)
+  ragMaxResults?: number;
+
+  @ApiPropertyOptional({ description: 'Max tokens for RAG context' })
+  @IsOptional()
+  @IsNumber()
+  @Min(100)
+  ragMaxTokens?: number;
 }
