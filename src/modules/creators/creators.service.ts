@@ -7,7 +7,7 @@ import { CreatorsRepository } from './repositories/creators.repository';
 import { CreateCreatorDto } from './dto/create-creator.dto';
 import { UpdateCreatorDto } from './dto/update-creator.dto';
 import { CreatorResponseDto } from './dto/creator-response.dto';
-import { Creator } from './entities/creator.entity';
+import { Creator, CreatorStatus } from './entities/creator.entity';
 import { UsersService } from '../users/users.service';
 import { UserRole } from '../../common/constants/roles.enum';
 
@@ -35,11 +35,11 @@ export class CreatorsService {
       return this.toResponseDto(existing);
     }
 
-    // Create creator profile with active status for v1
+    // Create creator profile with verified status for v1 (auto-approved)
     const creator = await this.creatorsRepository.create({
       userId,
       ...createCreatorDto,
-      status: 'active' as any, // Set to active for v1, no approval needed
+      status: CreatorStatus.VERIFIED, // Set to verified for v1, no approval needed
     });
 
     // Assign CREATOR role and mark onboarding as complete
