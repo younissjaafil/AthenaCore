@@ -26,15 +26,14 @@ export class ClerkStrategy extends PassportStrategy(Strategy, 'clerk') {
       throw new UnauthorizedException('Invalid token');
     }
 
-    // Find user from database
-    const user = await this.usersService.findByClerkId(clerkId);
-
-    if (!user) {
-      // User must be synced via webhook first
-      throw new UnauthorizedException(
-        'User not found. Please ensure webhook is configured in Clerk Dashboard.',
-      );
-    }
+    // Find or create user from database
+    // This ensures users are auto-created even without webhook setup
+    const user = await this.usersService.findOrCreate({
+      sub: clerkId,
+      email: payload.email,
+      firstName: payload.given_name || payload.first_name,
+      lastName: payload.family_name || payload.last_name,
+    });
 
     return user;
   }
