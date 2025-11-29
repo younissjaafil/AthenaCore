@@ -13,8 +13,15 @@ async function bootstrap() {
 
   // CORS
   app.enableCors({
-    origin: process.env.CORS_ORIGIN || '*',
+    origin: [
+      'http://localhost:3000',
+      'https://athena-front-beta.vercel.app',
+      'https://athena-ai.pro',
+      process.env.CORS_ORIGIN,
+    ].filter(Boolean),
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
   });
 
   // Global prefix
