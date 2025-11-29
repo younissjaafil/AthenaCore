@@ -11,7 +11,7 @@ import {
 import { Document } from '../../documents/entities/document.entity';
 import { Agent } from '../../agents/entities/agent.entity';
 
-@Entity('embedding')
+@Entity('embeddings')
 @Index(['agentId', 'documentId'])
 @Index(['agentId', 'chunkIndex'])
 export class Embedding {
