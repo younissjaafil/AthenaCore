@@ -11,43 +11,43 @@ import {
 import { Document } from '../../documents/entities/document.entity';
 import { Agent } from '../../agents/entities/agent.entity';
 
-@Entity('embeddings')
+@Entity('embedding')
 @Index(['agentId', 'documentId'])
 @Index(['agentId', 'chunkIndex'])
 export class Embedding {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column()
+  @Column({ name: 'agent_id', type: 'uuid' })
   @Index()
   agentId: string;
 
   @ManyToOne(() => Agent, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'agentId' })
+  @JoinColumn({ name: 'agent_id' })
   agent: Agent;
 
-  @Column()
+  @Column({ name: 'document_id', type: 'uuid' })
   @Index()
   documentId: string;
 
   @ManyToOne(() => Document, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'documentId' })
+  @JoinColumn({ name: 'document_id' })
   document: Document;
 
   // Chunk information
-  @Column({ type: 'int' })
+  @Column({ name: 'chunk_index', type: 'int' })
   chunkIndex: number;
 
   @Column({ type: 'text' })
   content: string;
 
-  @Column({ type: 'int' })
+  @Column({ name: 'token_count', type: 'int' })
   tokenCount: number;
 
-  @Column({ type: 'int', nullable: true })
+  @Column({ name: 'start_position', type: 'int', nullable: true })
   startPosition?: number;
 
-  @Column({ type: 'int', nullable: true })
+  @Column({ name: 'end_position', type: 'int', nullable: true })
   endPosition?: number;
 
   // Note: Vector is stored in Qdrant, not PostgreSQL
@@ -68,9 +68,9 @@ export class Embedding {
     [key: string]: any;
   };
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 }
