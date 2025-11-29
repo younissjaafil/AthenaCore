@@ -9,6 +9,7 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  NotFoundException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -43,10 +44,12 @@ export class CreatorsController {
     type: CreatorResponseDto,
   })
   @ApiResponse({ status: 404, description: 'Creator profile not found' })
-  async getMyProfile(
-    @CurrentUser() user: User,
-  ): Promise<CreatorResponseDto | null> {
-    return this.creatorsService.findByUserId(user.id);
+  async getMyProfile(@CurrentUser() user: User): Promise<CreatorResponseDto> {
+    const creator = await this.creatorsService.findByUserId(user.id);
+    if (!creator) {
+      throw new NotFoundException('Creator profile not found');
+    }
+    return creator;
   }
 
   @Post()
