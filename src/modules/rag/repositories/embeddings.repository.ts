@@ -4,7 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Embedding } from '../entities/embedding.entity';
 import { QdrantService } from '../../../infrastructure/vector-store/qdrant.service';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 
 export interface SimilaritySearchResult {
   embedding: Embedding;
@@ -23,7 +23,7 @@ export class EmbeddingsRepository {
 
   async create(data: Partial<Embedding>): Promise<Embedding> {
     // Generate ID if not provided
-    const id = data.id || uuidv4();
+    const id = data.id || randomUUID();
     const embeddingData = { ...data, id };
 
     // Save metadata to PostgreSQL (without vector)
@@ -54,7 +54,7 @@ export class EmbeddingsRepository {
     // Generate IDs and prepare data
     const embeddingsWithIds = data.map((d) => ({
       ...d,
-      id: d.id || uuidv4(),
+      id: d.id || randomUUID(),
     }));
 
     // Save metadata to PostgreSQL
