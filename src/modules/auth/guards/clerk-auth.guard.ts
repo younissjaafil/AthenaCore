@@ -5,14 +5,14 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { createClerkClient } from '@clerk/backend';
+import { verifyToken } from '@clerk/backend';
 import { ConfigService } from '../../../config/config.service';
 import { UsersService } from '../../users/users.service';
 import { IS_PUBLIC_KEY } from '../../../common/decorators/public.decorator';
 
 @Injectable()
 export class ClerkAuthGuard implements CanActivate {
-  private clerkClient: any;
+  private secretKey: string;
 
   constructor(
     private reflector: Reflector,
@@ -28,9 +28,7 @@ export class ClerkAuthGuard implements CanActivate {
       'ClerkAuthGuard initialized with secret key:',
       secretKey.substring(0, 10) + '...',
     );
-    this.clerkClient = createClerkClient({
-      secretKey: secretKey,
-    });
+    this.secretKey = secretKey;
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -58,9 +56,11 @@ export class ClerkAuthGuard implements CanActivate {
     const token = authHeader.substring(7);
 
     try {
-      // Verify the token using Clerk's built-in verification
+      // Verify the token using Clerk's verifyToken function
       console.log('Verifying Clerk token...');
-      const payload = await this.clerkClient.verifyToken(token);
+      const payload = await verifyToken(token, {
+        secretKey: this.secretKey,
+      });
       console.log('Token verified successfully. ClerkId:', payload.sub);
 
       const clerkId = payload.sub;
@@ -73,9 +73,11 @@ export class ClerkAuthGuard implements CanActivate {
       console.log('Finding or creating user:', clerkId);
       const user = await this.usersService.findOrCreate({
         sub: clerkId as string,
-        email: payload.email as string,
-        firstName: (payload.given_name || payload.first_name) as string,
-        lastName: (payload.family_name || payload.last_name) as string,
+        email: (payload as any).email as string,
+        firstName: ((payload as any).given_name ||
+          (payload as any).first_name) as string,
+        lastName: ((payload as any).family_name ||
+          (payload as any).last_name) as string,
       });
       console.log('User loaded:', user.id);
 
@@ -83,7 +85,7 @@ export class ClerkAuthGuard implements CanActivate {
       request.user = user;
 
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Clerk token verification failed:', error);
       console.error('Error details:', {
         message: error.message,
