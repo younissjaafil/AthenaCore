@@ -66,7 +66,7 @@ export class UsersController {
     @Body() updateUserDto: UpdateUserDto,
   ): Promise<UserResponseDto> {
     // Find user by clerkId
-    const user = await this.usersService.findByClerkId(
+    const user = await this.usersService.findByClerkIdOrThrow(
       clerkUser.sub || clerkUser.clerkId,
     );
 

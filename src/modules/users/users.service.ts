@@ -44,7 +44,11 @@ export class UsersService {
     return user;
   }
 
-  async findByClerkId(clerkId: string): Promise<User> {
+  async findByClerkId(clerkId: string): Promise<User | null> {
+    return this.usersRepository.findByClerkId(clerkId);
+  }
+
+  async findByClerkIdOrThrow(clerkId: string): Promise<User> {
     const user = await this.usersRepository.findByClerkId(clerkId);
     if (!user) {
       throw new NotFoundException(`User with Clerk ID ${clerkId} not found`);

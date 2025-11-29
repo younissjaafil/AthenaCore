@@ -5,7 +5,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { verifyToken } from '@clerk/backend';
+import { verifyToken, createClerkClient } from '@clerk/backend';
 import { ConfigService } from '../../../config/config.service';
 import { UsersService } from '../../users/users.service';
 import { IS_PUBLIC_KEY } from '../../../common/decorators/public.decorator';
@@ -13,6 +13,7 @@ import { IS_PUBLIC_KEY } from '../../../common/decorators/public.decorator';
 @Injectable()
 export class ClerkAuthGuard implements CanActivate {
   private secretKey: string;
+  private clerkClient: ReturnType<typeof createClerkClient>;
 
   constructor(
     private reflector: Reflector,
@@ -29,6 +30,7 @@ export class ClerkAuthGuard implements CanActivate {
       secretKey.substring(0, 10) + '...',
     );
     this.secretKey = secretKey;
+    this.clerkClient = createClerkClient({ secretKey });
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -71,14 +73,29 @@ export class ClerkAuthGuard implements CanActivate {
       // Find or create user from database
       // This ensures users are auto-created even without webhook setup
       console.log('Finding or creating user:', clerkId);
-      const user = await this.usersService.findOrCreate({
-        sub: clerkId as string,
-        email: (payload as any).email as string,
-        firstName: ((payload as any).given_name ||
-          (payload as any).first_name) as string,
-        lastName: ((payload as any).family_name ||
-          (payload as any).last_name) as string,
-      });
+
+      // First try to find existing user
+      let user = await this.usersService.findByClerkId(clerkId);
+
+      if (!user) {
+        // User doesn't exist, fetch details from Clerk API
+        console.log('User not found, fetching from Clerk API...');
+        const clerkUser = await this.clerkClient.users.getUser(clerkId);
+        console.log(
+          'Clerk user fetched:',
+          clerkUser.emailAddresses?.[0]?.emailAddress,
+        );
+
+        user = await this.usersService.findOrCreate({
+          sub: clerkId,
+          email:
+            clerkUser.emailAddresses?.[0]?.emailAddress ||
+            `${clerkId}@placeholder.com`,
+          firstName: clerkUser.firstName || undefined,
+          lastName: clerkUser.lastName || undefined,
+        });
+      }
+
       console.log('User loaded:', user.id);
 
       // Attach user to request
