@@ -101,7 +101,9 @@ export class EmbeddingsService {
         position,
         position + this.maxTokensPerChunk,
       );
-      const chunkText = this.encoder.decode(chunkTokens);
+      // decode returns Uint8Array, convert to string
+      const decoded = this.encoder.decode(chunkTokens);
+      const chunkText = new TextDecoder().decode(decoded);
 
       chunks.push({
         content: chunkText.trim(),
