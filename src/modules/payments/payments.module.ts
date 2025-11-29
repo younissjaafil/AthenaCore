@@ -9,7 +9,8 @@ import { EntitlementsRepository } from './repositories/entitlements.repository';
 import { Transaction } from './entities/transaction.entity';
 import { Entitlement } from './entities/entitlement.entity';
 import { Agent } from '../agents/entities/agent.entity';
-import { AuthModule } from '../auth/auth.module';
+import { ConfigModule } from '../../config/config.module';
+import { UsersModule } from '../users/users.module';
 
 @Module({
   imports: [
@@ -18,7 +19,8 @@ import { AuthModule } from '../auth/auth.module';
       timeout: 10000,
       maxRedirects: 5,
     }),
-    AuthModule,
+    ConfigModule,
+    UsersModule,
   ],
   controllers: [PaymentsController],
   providers: [

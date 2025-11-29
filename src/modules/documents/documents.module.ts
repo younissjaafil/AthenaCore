@@ -6,14 +6,16 @@ import { Document } from './entities/document.entity';
 import { DocumentsRepository } from './repositories/documents.repository';
 import { AgentsModule } from '../agents/agents.module';
 import { S3Module } from '../../infrastructure/storage/s3.module';
-import { AuthModule } from '../auth/auth.module';
+import { ConfigModule } from '../../config/config.module';
+import { UsersModule } from '../users/users.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Document]),
     AgentsModule,
     S3Module,
-    AuthModule,
+    ConfigModule,
+    UsersModule,
   ],
   controllers: [DocumentsController],
   providers: [DocumentsService, DocumentsRepository],
