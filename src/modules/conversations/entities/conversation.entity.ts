@@ -21,7 +21,6 @@ export enum ConversationStatus {
 
 @Entity('conversation')
 @Index(['userId', 'agentId'])
-@Index(['userId', 'status'])
 export class Conversation {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -43,18 +42,17 @@ export class Conversation {
   @Column({ type: 'varchar', length: 200, nullable: true })
   title: string;
 
-  @Column({
-    type: 'enum',
-    enum: ConversationStatus,
-    default: ConversationStatus.ACTIVE,
-  })
-  status: ConversationStatus;
+  @Column({ name: 'is_archived', type: 'boolean', default: false })
+  isArchived: boolean;
 
-  @Column({ name: 'message_count', type: 'int', default: 0 })
-  messageCount: number;
+  @Column({ name: 'total_messages', type: 'int', default: 0 })
+  totalMessages: number;
 
-  @Column({ name: 'last_message_at', type: 'timestamp', nullable: true })
-  lastMessageAt: Date;
+  @Column({ name: 'total_tokens', type: 'int', default: 0 })
+  totalTokens: number;
+
+  @Column({ type: 'jsonb', nullable: true })
+  metadata: Record<string, any>;
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access
   @OneToMany(() => Message, (message: any) => message.conversation, {
@@ -67,4 +65,16 @@ export class Conversation {
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
+
+  // Virtual property to map isArchived to status for backwards compatibility
+  get status(): ConversationStatus {
+    return this.isArchived
+      ? ConversationStatus.ARCHIVED
+      : ConversationStatus.ACTIVE;
+  }
+
+  // Virtual property for backwards compatibility
+  get messageCount(): number {
+    return this.totalMessages;
+  }
 }

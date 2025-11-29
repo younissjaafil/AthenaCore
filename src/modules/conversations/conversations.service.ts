@@ -70,8 +70,9 @@ export class ConversationsService {
       userId,
       agentId: dto.agentId,
       title: dto.title || `Conversation with ${agent.name}`,
-      status: ConversationStatus.ACTIVE,
-      messageCount: 0,
+      isArchived: false,
+      totalMessages: 0,
+      totalTokens: 0,
     });
 
     this.logger.log(
@@ -139,9 +140,8 @@ export class ConversationsService {
       metadata: assistantResponse.metadata,
     });
 
-    // Update conversation
+    // Update conversation message count
     await this.conversationsRepository.incrementMessageCount(conversationId);
-    await this.conversationsRepository.updateLastMessageTime(conversationId);
 
     this.logger.log(
       `User message saved to conversation ${conversationId}, AI response generated${useRag ? ' with RAG' : ''}`,
@@ -371,8 +371,8 @@ export class ConversationsService {
       agentId: conversation.agentId,
       title: conversation.title || undefined,
       status: conversation.status,
-      messageCount: conversation.messageCount,
-      lastMessageAt: conversation.lastMessageAt || undefined,
+      messageCount: conversation.totalMessages,
+      lastMessageAt: conversation.updatedAt,
       agent: conversation.agent
         ? {
             id: conversation.agent.id,

@@ -36,9 +36,9 @@ export class ConversationsRepository {
       where: {
         userId,
         agentId,
-        status: ConversationStatus.ACTIVE,
+        isArchived: false,
       },
-      order: { lastMessageAt: 'DESC' },
+      order: { updatedAt: 'DESC' },
     });
   }
 
@@ -47,14 +47,16 @@ export class ConversationsRepository {
     status?: ConversationStatus,
   ): Promise<Conversation[]> {
     const where: FindOptionsWhere<Conversation> = { userId };
-    if (status) {
-      where.status = status;
+    if (status === ConversationStatus.ARCHIVED) {
+      where.isArchived = true;
+    } else if (status === ConversationStatus.ACTIVE) {
+      where.isArchived = false;
     }
 
     return this.repository.find({
       where,
       relations: ['agent'],
-      order: { lastMessageAt: 'DESC' },
+      order: { updatedAt: 'DESC' },
     });
   }
 
@@ -63,10 +65,10 @@ export class ConversationsRepository {
   }
 
   async incrementMessageCount(id: string): Promise<void> {
-    await this.repository.increment({ id }, 'messageCount', 1);
+    await this.repository.increment({ id }, 'totalMessages', 1);
   }
 
-  async updateLastMessageTime(id: string): Promise<void> {
-    await this.repository.update(id, { lastMessageAt: new Date() });
+  async incrementTokenCount(id: string, tokens: number): Promise<void> {
+    await this.repository.increment({ id }, 'totalTokens', tokens);
   }
 }
