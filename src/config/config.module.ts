@@ -6,6 +6,7 @@ import { validateSync } from 'class-validator';
 import { EnvironmentVariables } from './validation.env';
 
 @Module({
+  global: true,
   imports: [
     NestConfigModule.forRoot({
       isGlobal: true,

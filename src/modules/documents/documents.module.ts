@@ -6,7 +6,6 @@ import { Document } from './entities/document.entity';
 import { DocumentsRepository } from './repositories/documents.repository';
 import { AgentsModule } from '../agents/agents.module';
 import { S3Module } from '../../infrastructure/storage/s3.module';
-import { ConfigModule } from '../../config/config.module';
 import { UsersModule } from '../users/users.module';
 
 @Module({
@@ -14,7 +13,6 @@ import { UsersModule } from '../users/users.module';
     TypeOrmModule.forFeature([Document]),
     AgentsModule,
     S3Module,
-    ConfigModule,
     UsersModule,
   ],
   controllers: [DocumentsController],

@@ -9,7 +9,6 @@ import { EntitlementsRepository } from './repositories/entitlements.repository';
 import { Transaction } from './entities/transaction.entity';
 import { Entitlement } from './entities/entitlement.entity';
 import { Agent } from '../agents/entities/agent.entity';
-import { ConfigModule } from '../../config/config.module';
 import { UsersModule } from '../users/users.module';
 
 @Module({
@@ -19,7 +18,6 @@ import { UsersModule } from '../users/users.module';
       timeout: 10000,
       maxRedirects: 5,
     }),
-    ConfigModule,
     UsersModule,
   ],
   controllers: [PaymentsController],

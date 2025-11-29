@@ -6,13 +6,12 @@ import { SessionsRepository } from './repositories/sessions.repository';
 import { Session } from './entities/session.entity';
 import { User } from '../users/entities/user.entity';
 import { Creator } from '../creators/entities/creator.entity';
-import { ConfigModule } from '../../config/config.module';
 import { UsersModule } from '../users/users.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Session, User, Creator]),
-    ConfigModule,
+    UsersModule,
     UsersModule,
   ],
   controllers: [SessionsController],

@@ -7,7 +7,6 @@ import { EmbeddingsService } from './embeddings.service';
 import { VectorSearchService } from './vector-search.service';
 import { RagController } from './rag.controller';
 import { DocumentsModule } from '../documents/documents.module';
-import { ConfigModule } from '../../config/config.module';
 import { UsersModule } from '../users/users.module';
 
 @Module({
@@ -15,7 +14,6 @@ import { UsersModule } from '../users/users.module';
     TypeOrmModule.forFeature([Embedding]),
     CacheModule.register(),
     DocumentsModule,
-    ConfigModule,
     UsersModule,
   ],
   controllers: [RagController],
