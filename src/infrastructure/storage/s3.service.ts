@@ -17,15 +17,38 @@ export class S3Service {
   private readonly region: string;
 
   constructor(private configService: ConfigService) {
-    this.bucketName = this.configService.s3BucketName!;
+    this.bucketName = this.configService.s3BucketName || '';
     this.region = this.configService.s3Region;
+
+    const accessKey = this.configService.s3AccessKey;
+    const secretKey = this.configService.s3SecretKey;
+
+    if (!accessKey || !secretKey) {
+      this.logger.warn(
+        'S3 credentials not configured. File uploads will fail.',
+      );
+      this.logger.warn(
+        `Access Key present: ${!!accessKey}, Secret Key present: ${!!secretKey}`,
+      );
+    }
+
+    if (!this.bucketName) {
+      this.logger.warn('S3 bucket name not configured.');
+    }
+
+    this.logger.log(
+      `S3 configured for region: ${this.region}, bucket: ${this.bucketName}`,
+    );
 
     this.s3Client = new S3Client({
       region: this.region,
-      credentials: {
-        accessKeyId: this.configService.s3AccessKey!,
-        secretAccessKey: this.configService.s3SecretKey!,
-      },
+      credentials:
+        accessKey && secretKey
+          ? {
+              accessKeyId: accessKey,
+              secretAccessKey: secretKey,
+            }
+          : undefined,
     });
   }
 

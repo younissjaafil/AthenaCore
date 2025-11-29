@@ -46,11 +46,17 @@ export class ConfigService {
 
   // AWS S3
   get s3AccessKey(): string | undefined {
-    return this.configService.get<string>('S3_ACCESS_KEY');
+    return (
+      this.configService.get<string>('S3_ACCESS_KEY') ||
+      this.configService.get<string>('AWS_ACCESS_KEY_ID')
+    );
   }
 
   get s3SecretKey(): string | undefined {
-    return this.configService.get<string>('S3_SECRET_KEY');
+    return (
+      this.configService.get<string>('S3_SECRET_KEY') ||
+      this.configService.get<string>('AWS_SECRET_ACCESS_KEY')
+    );
   }
 
   get s3BucketName(): string | undefined {
@@ -58,7 +64,11 @@ export class ConfigService {
   }
 
   get s3Region(): string {
-    return this.configService.get<string>('S3_REGION', 'us-east-1');
+    return (
+      this.configService.get<string>('S3_REGION') ||
+      this.configService.get<string>('AWS_REGION') ||
+      'us-east-1'
+    );
   }
 
   get s3BucketUrl(): string | undefined {
