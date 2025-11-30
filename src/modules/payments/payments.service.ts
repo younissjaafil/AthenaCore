@@ -275,6 +275,35 @@ export class PaymentsService {
   }
 
   /**
+   * Manually process a payment and grant entitlement (admin use)
+   */
+  async manuallyProcessPayment(transactionId: string): Promise<void> {
+    const transaction =
+      await this.transactionsRepository.findById(transactionId);
+
+    if (!transaction) {
+      throw new NotFoundException(`Transaction ${transactionId} not found`);
+    }
+
+    // Update transaction status to success
+    await this.transactionsRepository.update(transaction.id, {
+      status: TransactionStatus.SUCCESS,
+      completedAt: new Date(),
+    });
+
+    // Grant entitlement
+    if (transaction.agentId) {
+      await this.grantEntitlement(
+        transaction.userId,
+        transaction.agentId,
+        transaction.id,
+      );
+    }
+
+    this.logger.log(`Payment manually processed: ${transactionId}`);
+  }
+
+  /**
    * Grant entitlement to user for an agent
    */
   private async grantEntitlement(

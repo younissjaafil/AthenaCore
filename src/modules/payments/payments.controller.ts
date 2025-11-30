@@ -215,4 +215,21 @@ export class PaymentsController {
     await this.paymentsService.handlePaymentCallback(externalId, 'failure');
     return { message: 'Payment failed' };
   }
+
+  @Post('admin/grant-entitlement/:transactionId')
+  @ApiBearerAuth()
+  @UseGuards(ClerkAuthGuard)
+  @ApiOperation({
+    summary: 'Manually grant entitlement',
+    description:
+      'Admin endpoint to manually process a successful payment and grant entitlement',
+  })
+  @ApiParam({ name: 'transactionId', description: 'Transaction ID' })
+  @ApiResponse({ status: 200, description: 'Entitlement granted' })
+  async manuallyGrantEntitlement(
+    @Param('transactionId') transactionId: string,
+  ): Promise<{ message: string }> {
+    await this.paymentsService.manuallyProcessPayment(transactionId);
+    return { message: 'Entitlement granted successfully' };
+  }
 }
