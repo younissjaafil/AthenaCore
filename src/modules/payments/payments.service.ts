@@ -488,13 +488,18 @@ export class PaymentsService {
   /**
    * Get revenue stats for a creator's agents
    */
-  async getCreatorRevenue(creatorId: string): Promise<{
+  async getCreatorRevenue(userId: string): Promise<{
     totalRevenue: number;
     transactionCount: number;
-    revenueByAgent: { agentId: string; agentName?: string; revenue: number; count: number }[];
+    revenueByAgent: {
+      agentId: string;
+      agentName?: string;
+      revenue: number;
+      count: number;
+    }[];
   }> {
-    // Get all agents owned by this creator
-    const agents = await this.agentsService.findByCreator(creatorId);
+    // Get all agents owned by this user (uses findMyAgents which looks up creator profile)
+    const agents = await this.agentsService.findMyAgents(userId);
     const agentIds = agents.map((a) => a.id);
 
     if (agentIds.length === 0) {

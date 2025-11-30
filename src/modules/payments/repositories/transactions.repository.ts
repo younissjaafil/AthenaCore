@@ -82,7 +82,9 @@ export class TransactionsRepository {
       .addSelect('SUM(transaction.amount)', 'revenue')
       .addSelect('COUNT(*)', 'count')
       .where('transaction.agent_id IN (:...agentIds)', { agentIds })
-      .andWhere('transaction.status = :status', { status: TransactionStatus.SUCCESS })
+      .andWhere('transaction.status = :status', {
+        status: TransactionStatus.SUCCESS,
+      })
       .groupBy('transaction.agent_id')
       .getRawMany<{ agentId: string; revenue: string; count: string }>();
 
@@ -93,7 +95,10 @@ export class TransactionsRepository {
     }));
 
     const totalRevenue = revenueByAgent.reduce((sum, r) => sum + r.revenue, 0);
-    const transactionCount = revenueByAgent.reduce((sum, r) => sum + r.count, 0);
+    const transactionCount = revenueByAgent.reduce(
+      (sum, r) => sum + r.count,
+      0,
+    );
 
     return { totalRevenue, transactionCount, revenueByAgent };
   }
