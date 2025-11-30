@@ -66,4 +66,35 @@ export class TransactionsRepository {
       order: { createdAt: 'DESC' },
     });
   }
+
+  async getRevenueByAgentIds(agentIds: string[]): Promise<{
+    totalRevenue: number;
+    transactionCount: number;
+    revenueByAgent: { agentId: string; revenue: number; count: number }[];
+  }> {
+    if (agentIds.length === 0) {
+      return { totalRevenue: 0, transactionCount: 0, revenueByAgent: [] };
+    }
+
+    const result = await this.repository
+      .createQueryBuilder('transaction')
+      .select('transaction.agent_id', 'agentId')
+      .addSelect('SUM(transaction.amount)', 'revenue')
+      .addSelect('COUNT(*)', 'count')
+      .where('transaction.agent_id IN (:...agentIds)', { agentIds })
+      .andWhere('transaction.status = :status', { status: TransactionStatus.SUCCESS })
+      .groupBy('transaction.agent_id')
+      .getRawMany<{ agentId: string; revenue: string; count: string }>();
+
+    const revenueByAgent = result.map((r) => ({
+      agentId: r.agentId,
+      revenue: parseFloat(r.revenue) || 0,
+      count: parseInt(r.count, 10) || 0,
+    }));
+
+    const totalRevenue = revenueByAgent.reduce((sum, r) => sum + r.revenue, 0);
+    const transactionCount = revenueByAgent.reduce((sum, r) => sum + r.count, 0);
+
+    return { totalRevenue, transactionCount, revenueByAgent };
+  }
 }

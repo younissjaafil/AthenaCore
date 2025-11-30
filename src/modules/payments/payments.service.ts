@@ -484,4 +484,40 @@ export class PaymentsService {
       updatedAt: transaction.updatedAt,
     };
   }
+
+  /**
+   * Get revenue stats for a creator's agents
+   */
+  async getCreatorRevenue(creatorId: string): Promise<{
+    totalRevenue: number;
+    transactionCount: number;
+    revenueByAgent: { agentId: string; agentName?: string; revenue: number; count: number }[];
+  }> {
+    // Get all agents owned by this creator
+    const agents = await this.agentsService.findByCreator(creatorId);
+    const agentIds = agents.map((a) => a.id);
+
+    if (agentIds.length === 0) {
+      return { totalRevenue: 0, transactionCount: 0, revenueByAgent: [] };
+    }
+
+    // Get revenue data
+    const revenueData =
+      await this.transactionsRepository.getRevenueByAgentIds(agentIds);
+
+    // Add agent names
+    const revenueByAgent = revenueData.revenueByAgent.map((r) => {
+      const agent = agents.find((a) => a.id === r.agentId);
+      return {
+        ...r,
+        agentName: agent?.name,
+      };
+    });
+
+    return {
+      totalRevenue: revenueData.totalRevenue,
+      transactionCount: revenueData.transactionCount,
+      revenueByAgent,
+    };
+  }
 }

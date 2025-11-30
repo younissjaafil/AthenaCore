@@ -238,6 +238,38 @@ export class PaymentsController {
     return this.paymentsService.syncAllPendingPayments();
   }
 
+  @Get('creator/revenue')
+  @ApiBearerAuth()
+  @UseGuards(ClerkAuthGuard)
+  @ApiOperation({
+    summary: 'Get creator revenue',
+    description: 'Get total revenue and breakdown by agent for the creator',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Revenue data retrieved successfully',
+    schema: {
+      properties: {
+        totalRevenue: { type: 'number' },
+        transactionCount: { type: 'number' },
+        revenueByAgent: {
+          type: 'array',
+          items: {
+            properties: {
+              agentId: { type: 'string' },
+              agentName: { type: 'string' },
+              revenue: { type: 'number' },
+              count: { type: 'number' },
+            },
+          },
+        },
+      },
+    },
+  })
+  async getCreatorRevenue(@CurrentUser('sub') userId: string) {
+    return this.paymentsService.getCreatorRevenue(userId);
+  }
+
   @Post('callback/success')
   @Public()
   @ApiOperation({
