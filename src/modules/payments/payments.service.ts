@@ -51,17 +51,15 @@ export class PaymentsService {
     // Generate external ID
     const externalId = await this.transactionsRepository.getNextExternalId();
 
-    // Set default callback/redirect URLs if not provided
+    // Set default callback/redirect URLs using athena-ai.pro domain
     const baseUrl = this.configService.get<string>(
       'WHISH_WEBSITE_URL',
       'athena-ai.pro',
     );
     const successCallbackUrl =
-      dto.successCallbackUrl ||
-      `https://${baseUrl}/api/payments/callback/success`;
+      dto.successCallbackUrl || `https://${baseUrl}/api/payment/success`;
     const failureCallbackUrl =
-      dto.failureCallbackUrl ||
-      `https://${baseUrl}/api/payments/callback/failure`;
+      dto.failureCallbackUrl || `https://${baseUrl}/api/payment/failure`;
     const successRedirectUrl =
       dto.successRedirectUrl || `https://${baseUrl}/payment/success`;
     const failureRedirectUrl =

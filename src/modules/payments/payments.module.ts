@@ -2,6 +2,7 @@ import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { HttpModule } from '@nestjs/axios';
 import { PaymentsController } from './payments.controller';
+import { PaymentCallbackController } from './payment-callback.controller';
 import { PaymentsService } from './payments.service';
 import { WhishService } from './services/whish.service';
 import { TransactionsRepository } from './repositories/transactions.repository';
@@ -22,7 +23,7 @@ import { AgentsModule } from '../agents/agents.module';
     UsersModule,
     forwardRef(() => AgentsModule),
   ],
-  controllers: [PaymentsController],
+  controllers: [PaymentsController, PaymentCallbackController],
   providers: [
     PaymentsService,
     WhishService,

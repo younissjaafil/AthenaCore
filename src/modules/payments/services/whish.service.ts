@@ -82,12 +82,37 @@ export class WhishService {
   async createPayment(
     request: WhishPaymentRequest,
   ): Promise<WhishPaymentResponseDto> {
+    if (!this.baseUrl) {
+      this.logger.error('WHISH_BASE_URL is not configured');
+      throw new HttpException(
+        'Payment gateway not configured',
+        HttpStatus.SERVICE_UNAVAILABLE,
+      );
+    }
+
+    const apiUrl = `${this.baseUrl}/payment/whish`;
+
+    // Prepare payload - Whish expects externalId as Long (number)
+    const payload = {
+      amount: request.amount,
+      currency: request.currency,
+      invoice: request.invoice,
+      externalId: parseInt(request.externalId, 10),
+      successCallbackUrl: request.successCallbackUrl,
+      failureCallbackUrl: request.failureCallbackUrl,
+      successRedirectUrl: request.successRedirectUrl,
+      failureRedirectUrl: request.failureRedirectUrl,
+    };
+
+    this.logger.log(`Creating payment - URL: ${apiUrl}`);
+    this.logger.log(`Payment payload: ${JSON.stringify(payload)}`);
+
     try {
       const response: AxiosResponse<WhishApiResponse<WhishPaymentResponseDto>> =
         await firstValueFrom(
           this.httpService.post<WhishApiResponse<WhishPaymentResponseDto>>(
-            `${this.baseUrl}/payment/whish`,
-            request,
+            apiUrl,
+            payload,
             {
               headers: this.getHeaders(),
             },
@@ -128,12 +153,18 @@ export class WhishService {
   async getPaymentStatus(
     request: GetPaymentStatusDto,
   ): Promise<WhishStatusResponseDto> {
+    // Prepare payload - Whish expects externalId as Long (number)
+    const payload = {
+      currency: request.currency,
+      externalId: parseInt(request.externalId, 10),
+    };
+
     try {
       const response: AxiosResponse<WhishApiResponse<WhishStatusResponseDto>> =
         await firstValueFrom(
           this.httpService.post<WhishApiResponse<WhishStatusResponseDto>>(
             `${this.baseUrl}/payment/collect/status`,
-            request,
+            payload,
             {
               headers: this.getHeaders(),
             },
