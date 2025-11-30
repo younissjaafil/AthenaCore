@@ -10,6 +10,7 @@ import { Repository } from 'typeorm';
 import OpenAI from 'openai';
 import { ConversationsRepository } from './repositories/conversations.repository';
 import { MessagesRepository } from './repositories/messages.repository';
+import { ConversationCacheService } from './cache/conversation-cache.service';
 import { VectorSearchService } from '../rag/vector-search.service';
 import {
   Conversation,
@@ -31,6 +32,7 @@ export class ConversationsService {
     private readonly configService: ConfigService,
     private readonly conversationsRepository: ConversationsRepository,
     private readonly messagesRepository: MessagesRepository,
+    private readonly cacheService: ConversationCacheService,
     private readonly vectorSearchService: VectorSearchService,
     @InjectRepository(Agent)
     private readonly agentRepository: Repository<Agent>,
@@ -74,6 +76,9 @@ export class ConversationsService {
       totalMessages: 0,
       totalTokens: 0,
     });
+
+    // Invalidate user's conversation list cache
+    await this.cacheService.invalidateConversationListCache(userId);
 
     this.logger.log(
       `Created conversation ${conversation.id} for user ${userId} with agent ${dto.agentId}`,
@@ -143,38 +148,88 @@ export class ConversationsService {
     // Update conversation message count
     await this.conversationsRepository.incrementMessageCount(conversationId);
 
+    // Update cache with new messages
+    const userMessageDto = this.mapMessageToDto(userMessage);
+    const assistantMessageDto = this.mapMessageToDto(assistantMessage);
+
+    await this.cacheService.updateConversationAfterMessage(
+      conversationId,
+      conversation.userId,
+      userMessageDto,
+    );
+    await this.cacheService.updateConversationAfterMessage(
+      conversationId,
+      conversation.userId,
+      assistantMessageDto,
+    );
+
     this.logger.log(
       `User message saved to conversation ${conversationId}, AI response generated${useRag ? ' with RAG' : ''}`,
     );
 
     return {
-      userMessage: this.mapMessageToDto(userMessage),
-      assistantMessage: this.mapMessageToDto(assistantMessage),
+      userMessage: userMessageDto,
+      assistantMessage: assistantMessageDto,
     };
   }
 
   /**
-   * Get user's conversations
+   * Get user's conversations (with caching)
    */
   async getUserConversations(
     userId: string,
     status?: ConversationStatus,
   ): Promise<ConversationResponseDto[]> {
+    // Try cache first
+    const cached = await this.cacheService.getConversationList(userId, status);
+    if (cached) {
+      this.logger.debug(`Cache hit for user ${userId} conversations`);
+      return cached;
+    }
+
+    // Cache miss - fetch from DB
+    this.logger.debug(`Cache miss for user ${userId} conversations`);
     const conversations = await this.conversationsRepository.findByUser(
       userId,
       status,
     );
 
-    return conversations.map((conv) => this.mapToResponseDto(conv));
+    const dtos = conversations.map((conv) => this.mapToResponseDto(conv));
+
+    // Cache the result
+    await this.cacheService.setConversationList(userId, dtos, status);
+
+    return dtos;
   }
 
   /**
-   * Get conversation with messages
+   * Get conversation with messages (with caching)
    */
   async getConversation(
     userId: string,
     conversationId: string,
   ): Promise<ConversationResponseDto> {
+    // Try cache first
+    const cachedConversation =
+      await this.cacheService.getConversationDetail(conversationId);
+    const cachedMessages = await this.cacheService.getMessages(conversationId);
+
+    if (cachedConversation && cachedMessages) {
+      // Verify user access from cache
+      if (cachedConversation.userId !== userId) {
+        throw new BadRequestException(
+          'You do not have access to this conversation',
+        );
+      }
+      this.logger.debug(`Cache hit for conversation ${conversationId}`);
+      return {
+        ...cachedConversation,
+        messages: cachedMessages,
+      };
+    }
+
+    // Cache miss - fetch from DB
+    this.logger.debug(`Cache miss for conversation ${conversationId}`);
     const conversation = await this.conversationsRepository.findById(
       conversationId,
       ['agent'],
@@ -195,9 +250,19 @@ export class ConversationsService {
     const messages =
       await this.messagesRepository.findByConversation(conversationId);
 
+    const conversationDto = this.mapToResponseDto(conversation);
+    const messageDtos = messages.map((msg) => this.mapMessageToDto(msg));
+
+    // Cache the results
+    await this.cacheService.setConversationDetail(
+      conversationId,
+      conversationDto,
+    );
+    await this.cacheService.setMessages(conversationId, messageDtos);
+
     return {
-      ...this.mapToResponseDto(conversation),
-      messages: messages.map((msg) => this.mapMessageToDto(msg)),
+      ...conversationDto,
+      messages: messageDtos,
     };
   }
 
@@ -226,6 +291,9 @@ export class ConversationsService {
     await this.conversationsRepository.update(conversationId, {
       status: ConversationStatus.ARCHIVED,
     });
+
+    // Invalidate cache
+    await this.cacheService.invalidateConversationCache(conversationId, userId);
 
     this.logger.log(
       `Conversation ${conversationId} archived by user ${userId}`,
@@ -257,6 +325,9 @@ export class ConversationsService {
     await this.conversationsRepository.update(conversationId, {
       status: ConversationStatus.DELETED,
     });
+
+    // Invalidate cache
+    await this.cacheService.invalidateConversationCache(conversationId, userId);
 
     this.logger.log(`Conversation ${conversationId} deleted by user ${userId}`);
   }
@@ -354,8 +425,9 @@ export class ConversationsService {
       this.logger.log(
         `OpenAI response generated for conversation ${conversation.id}, tokens: ${completion.usage?.total_tokens}`,
       );
-    } catch (error: any) {
-      this.logger.error(`OpenAI API error: ${error.message}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`OpenAI API error: ${message}`);
       responseContent =
         'I apologize, but I encountered an error while processing your request. Please try again later.';
     }
