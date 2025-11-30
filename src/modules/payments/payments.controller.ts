@@ -68,6 +68,27 @@ export class PaymentsController {
     return this.paymentsService.createAgentPayment(userId, agentId, dto);
   }
 
+  @Post('session/:sessionId')
+  @ApiBearerAuth()
+  @UseGuards(ClerkAuthGuard)
+  @ApiOperation({
+    summary: 'Create payment for session',
+    description: 'Initiate payment for a confirmed session',
+  })
+  @ApiParam({ name: 'sessionId', description: 'Session ID' })
+  @ApiResponse({
+    status: 201,
+    description: 'Payment created successfully',
+    type: PaymentResponseDto,
+  })
+  async createSessionPayment(
+    @CurrentUser('sub') userId: string,
+    @Param('sessionId') sessionId: string,
+    @Body() dto: CreatePaymentDto,
+  ): Promise<PaymentResponseDto> {
+    return this.paymentsService.createSessionPayment(userId, sessionId, dto);
+  }
+
   @Get('transactions')
   @ApiBearerAuth()
   @UseGuards(ClerkAuthGuard)

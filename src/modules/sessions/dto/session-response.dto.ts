@@ -1,5 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { SessionStatus, VideoProvider } from '../entities/session.entity';
+import {
+  SessionStatus,
+  VideoProvider,
+  PaymentStatus,
+} from '../entities/session.entity';
 
 export class SessionResponseDto {
   @ApiProperty({
@@ -101,4 +105,25 @@ export class SessionResponseDto {
     required: false,
   })
   creatorNotes?: string;
+
+  @ApiProperty({
+    description: 'Payment status',
+    enum: PaymentStatus,
+    example: PaymentStatus.PENDING,
+  })
+  paymentStatus: PaymentStatus;
+
+  @ApiProperty({
+    description: 'Payment transaction ID',
+    example: '123e4567-e89b-12d3-a456-426614174003',
+    required: false,
+  })
+  paymentId?: string;
+
+  @ApiProperty({
+    description:
+      'Whether the meeting link is accessible (paid or free session)',
+    example: true,
+  })
+  canAccessMeeting: boolean;
 }

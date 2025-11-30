@@ -361,7 +361,9 @@ export class AvailabilityService {
       const hours = Math.floor(currentMinutes / 60);
       const mins = currentMinutes % 60;
       const slot = `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
-      this.logger.debug(`Adding slot: ${slot} (current=${currentMinutes}, next=${currentMinutes + duration + buffer})`);
+      this.logger.debug(
+        `Adding slot: ${slot} (current=${currentMinutes}, next=${currentMinutes + duration + buffer})`,
+      );
       slots.push(slot);
       currentMinutes += duration + buffer;
     }

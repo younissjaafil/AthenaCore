@@ -52,6 +52,9 @@ export class Transaction {
   @JoinColumn({ name: 'agent_id' })
   agent: Agent;
 
+  @Column({ name: 'session_id', type: 'uuid', nullable: true })
+  sessionId: string;
+
   @Column({ name: 'external_id', type: 'varchar', unique: true })
   externalId: string;
 
@@ -91,6 +94,7 @@ export class Transaction {
   metadata: {
     type?: TransactionType;
     invoice?: string;
+    sessionId?: string;
     successCallbackUrl?: string;
     failureCallbackUrl?: string;
     successRedirectUrl?: string;

@@ -15,6 +15,7 @@ import {
   Session,
   SessionStatus,
   VideoProvider,
+  PaymentStatus,
 } from './entities/session.entity';
 import { randomBytes } from 'crypto';
 
@@ -152,6 +153,13 @@ export class SessionsService {
       );
       updates.videoRoomUrl = videoData.url;
       updates.videoRoomId = videoData.roomId;
+
+      // Set payment status based on price
+      if (session.price && session.price > 0) {
+        updates.paymentStatus = PaymentStatus.PENDING;
+      } else {
+        updates.paymentStatus = PaymentStatus.NOT_REQUIRED;
+      }
     }
 
     // Handle cancellation
@@ -198,7 +206,7 @@ export class SessionsService {
       throw new NotFoundException(`Session ${sessionId} not found`);
     }
 
-    if (session.status !== SessionStatus.CONFIRMED) {
+    if (session.status !== 'confirmed') {
       throw new BadRequestException('Only confirmed sessions can be started');
     }
 
@@ -219,7 +227,7 @@ export class SessionsService {
       throw new NotFoundException(`Session ${sessionId} not found`);
     }
 
-    if (session.status !== SessionStatus.IN_PROGRESS) {
+    if (session.status !== 'in_progress') {
       throw new BadRequestException(
         'Only in-progress sessions can be completed',
       );
@@ -269,6 +277,16 @@ export class SessionsService {
    * Map session entity to response DTO
    */
   private mapToResponseDto(session: Session): SessionResponseDto {
+    const paymentStatus = session.paymentStatus || PaymentStatus.NOT_REQUIRED;
+
+    // User can access meeting if:
+    // - Session is confirmed AND
+    // - Payment is not required (free) OR payment is complete
+    const canAccessMeeting =
+      session.status === 'confirmed' &&
+      (paymentStatus === PaymentStatus.NOT_REQUIRED ||
+        paymentStatus === PaymentStatus.PAID);
+
     return {
       id: session.id,
       userId: session.userId,
@@ -283,12 +301,51 @@ export class SessionsService {
       durationMinutes: session.durationMinutes,
       status: session.status as SessionStatus,
       videoProvider: session.videoProvider as VideoProvider,
-      videoRoomUrl: session.videoRoomUrl ?? undefined,
-      videoRoomId: session.videoRoomId ?? undefined,
+      // Only show video URL if payment is complete or not required
+      videoRoomUrl: canAccessMeeting
+        ? (session.videoRoomUrl ?? undefined)
+        : undefined,
+      videoRoomId: canAccessMeeting
+        ? (session.videoRoomId ?? undefined)
+        : undefined,
       price: session.price ?? undefined,
       currency: session.currency ?? undefined,
       studentNotes: session.studentNotes ?? undefined,
       creatorNotes: session.creatorNotes ?? undefined,
+      paymentStatus: paymentStatus,
+      paymentId: session.paymentId ?? undefined,
+      canAccessMeeting,
     };
+  }
+
+  /**
+   * Mark session as paid
+   */
+  async markSessionAsPaid(
+    sessionId: string,
+    paymentId: string,
+  ): Promise<SessionResponseDto> {
+    const session = await this.sessionsRepository.findById(sessionId);
+
+    if (!session) {
+      throw new NotFoundException(`Session ${sessionId} not found`);
+    }
+
+    if (session.status !== 'confirmed') {
+      throw new BadRequestException(
+        'Only confirmed sessions can be marked as paid',
+      );
+    }
+
+    const updatedSession = await this.sessionsRepository.update(sessionId, {
+      paymentStatus: PaymentStatus.PAID,
+      paymentId,
+    });
+
+    this.logger.log(
+      `Session ${sessionId} marked as paid with payment ${paymentId}`,
+    );
+
+    return this.mapToResponseDto(updatedSession!);
   }
 }

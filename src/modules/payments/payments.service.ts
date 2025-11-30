@@ -18,6 +18,7 @@ import {
   TransactionStatus,
 } from './entities/transaction.entity';
 import { AgentsService } from '../agents/agents.service';
+import { SessionsService } from '../sessions/sessions.service';
 
 @Injectable()
 export class PaymentsService {
@@ -30,6 +31,8 @@ export class PaymentsService {
     private readonly whishService: WhishService,
     @Inject(forwardRef(() => AgentsService))
     private readonly agentsService: AgentsService,
+    @Inject(forwardRef(() => SessionsService))
+    private readonly sessionsService: SessionsService,
   ) {}
 
   /**
@@ -105,6 +108,76 @@ export class PaymentsService {
 
     this.logger.log(
       `Payment created for user ${userId}, agent ${agentId}: ${transaction.id}`,
+    );
+
+    return this.mapToResponseDto(transaction);
+  }
+
+  /**
+   * Create a payment for session booking
+   */
+  async createSessionPayment(
+    userId: string,
+    sessionId: string,
+    dto: CreatePaymentDto,
+  ): Promise<PaymentResponseDto> {
+    // Generate external ID
+    const externalId = await this.transactionsRepository.getNextExternalId();
+
+    // Website URL registered with Whish (athena-ai.pro)
+    const websiteUrl = this.configService.get<string>(
+      'WHISH_WEBSITE_URL',
+      'athena-ai.pro',
+    );
+
+    // All URLs go through the frontend domain (required by Whish)
+    const successCallbackUrl =
+      dto.successCallbackUrl || `https://${websiteUrl}/api/payment/success`;
+    const failureCallbackUrl =
+      dto.failureCallbackUrl || `https://${websiteUrl}/api/payment/failure`;
+    const successRedirectUrl =
+      dto.successRedirectUrl ||
+      `https://${websiteUrl}/student/payments/callback?status=success&sessionId=${sessionId}`;
+    const failureRedirectUrl =
+      dto.failureRedirectUrl ||
+      `https://${websiteUrl}/student/payments/callback?status=failed&sessionId=${sessionId}`;
+
+    // Create payment with Whish
+    const whishResponse = await this.whishService.createPayment({
+      amount: dto.amount,
+      currency: dto.currency,
+      invoice: dto.invoice || `Session booking payment`,
+      externalId,
+      successCallbackUrl,
+      failureCallbackUrl,
+      successRedirectUrl,
+      failureRedirectUrl,
+    });
+
+    // Save transaction
+    const transaction = await this.transactionsRepository.create({
+      userId,
+      sessionId,
+      externalId,
+      amount: dto.amount,
+      currency: dto.currency,
+      status: TransactionStatus.PENDING,
+      paymentMethod: 'whish',
+      collectUrl: whishResponse.collectUrl,
+      metadata: {
+        type: TransactionType.SESSION_BOOKING,
+        invoice: dto.invoice,
+        sessionId,
+        successCallbackUrl,
+        failureCallbackUrl,
+        successRedirectUrl,
+        failureRedirectUrl,
+        whishResponse,
+      },
+    });
+
+    this.logger.log(
+      `Session payment created for user ${userId}, session ${sessionId}: ${transaction.id}`,
     );
 
     return this.mapToResponseDto(transaction);
@@ -298,11 +371,19 @@ export class PaymentsService {
       completedAt: new Date(),
     });
 
-    // Grant entitlement if successful
+    // Grant entitlement if successful agent payment
     if (status === 'success' && transaction.agentId) {
       await this.grantEntitlement(
         transaction.userId,
         transaction.agentId,
+        transaction.id,
+      );
+    }
+
+    // Mark session as paid if successful session payment
+    if (status === 'success' && transaction.sessionId) {
+      await this.sessionsService.markSessionAsPaid(
+        transaction.sessionId,
         transaction.id,
       );
     }

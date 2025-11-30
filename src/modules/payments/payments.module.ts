@@ -12,6 +12,7 @@ import { Entitlement } from './entities/entitlement.entity';
 import { Agent } from '../agents/entities/agent.entity';
 import { UsersModule } from '../users/users.module';
 import { AgentsModule } from '../agents/agents.module';
+import { SessionsModule } from '../sessions/sessions.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { AgentsModule } from '../agents/agents.module';
     }),
     UsersModule,
     forwardRef(() => AgentsModule),
+    forwardRef(() => SessionsModule),
   ],
   controllers: [PaymentsController, PaymentCallbackController],
   providers: [

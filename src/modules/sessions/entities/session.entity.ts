@@ -20,6 +20,13 @@ export enum SessionStatus {
   NO_SHOW = 'no_show',
 }
 
+export enum PaymentStatus {
+  NOT_REQUIRED = 'not_required', // Free session or not yet confirmed
+  PENDING = 'pending', // Confirmed, awaiting payment
+  PAID = 'paid', // Payment received
+  REFUNDED = 'refunded', // Payment refunded
+}
+
 export enum VideoProvider {
   JITSI = 'jitsi',
   DAILY = 'daily',
@@ -89,6 +96,17 @@ export class Session {
 
   @Column({ name: 'cancellation_reason', type: 'text', nullable: true })
   cancellationReason: string;
+
+  @Column({
+    name: 'payment_status',
+    type: 'varchar',
+    length: 20,
+    default: PaymentStatus.NOT_REQUIRED,
+  })
+  paymentStatus: PaymentStatus;
+
+  @Column({ name: 'payment_id', type: 'uuid', nullable: true })
+  paymentId: string;
 
   @Column({ type: 'jsonb', nullable: true })
   metadata: Record<string, any>;
