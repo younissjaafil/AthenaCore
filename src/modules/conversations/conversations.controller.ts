@@ -3,6 +3,7 @@ import {
   Post,
   Get,
   Patch,
+  Delete,
   Body,
   Param,
   Query,
@@ -138,5 +139,24 @@ export class ConversationsController {
   ): Promise<{ message: string }> {
     await this.conversationsService.archiveConversation(userId, conversationId);
     return { message: 'Conversation archived successfully' };
+  }
+
+  @Delete(':id')
+  @ApiOperation({
+    summary: 'Delete a conversation',
+    description: 'Permanently delete a conversation and all its messages',
+  })
+  @ApiParam({ name: 'id', description: 'Conversation ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Conversation deleted successfully',
+  })
+  @ApiResponse({ status: 404, description: 'Conversation not found' })
+  async deleteConversation(
+    @CurrentUser('sub') userId: string,
+    @Param('id') conversationId: string,
+  ): Promise<{ message: string }> {
+    await this.conversationsService.deleteConversation(userId, conversationId);
+    return { message: 'Conversation deleted successfully' };
   }
 }

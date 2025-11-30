@@ -233,6 +233,35 @@ export class ConversationsService {
   }
 
   /**
+   * Delete a conversation (soft delete)
+   */
+  async deleteConversation(
+    userId: string,
+    conversationId: string,
+  ): Promise<void> {
+    const conversation =
+      await this.conversationsRepository.findById(conversationId);
+
+    if (!conversation) {
+      throw new NotFoundException(
+        `Conversation with ID ${conversationId} not found`,
+      );
+    }
+
+    if (conversation.userId !== userId) {
+      throw new BadRequestException(
+        'You do not have access to this conversation',
+      );
+    }
+
+    await this.conversationsRepository.update(conversationId, {
+      status: ConversationStatus.DELETED,
+    });
+
+    this.logger.log(`Conversation ${conversationId} deleted by user ${userId}`);
+  }
+
+  /**
    * Generate AI response with RAG context
    */
   private async generateAIResponse(
