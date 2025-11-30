@@ -57,8 +57,6 @@ export class SessionsService {
     const session = await this.sessionsRepository.create({
       userId,
       creatorId: dto.creatorId,
-      title: dto.title,
-      description: dto.description,
       scheduledAt,
       durationMinutes: dto.durationMinutes,
       videoProvider: dto.videoProvider || VideoProvider.JITSI,
@@ -279,22 +277,16 @@ export class SessionsService {
       creatorName: session.creator?.user?.firstName
         ? `${session.creator.user.firstName} ${session.creator.user.lastName || ''}`.trim()
         : undefined,
-      title: session.title,
-      description: session.description ?? undefined,
       scheduledAt: session.scheduledAt,
       durationMinutes: session.durationMinutes,
-      status: session.status,
-      videoProvider: session.videoProvider,
+      status: session.status as SessionStatus,
+      videoProvider: session.videoProvider as VideoProvider,
       videoRoomUrl: session.videoRoomUrl ?? undefined,
       videoRoomId: session.videoRoomId ?? undefined,
       price: session.price ?? undefined,
       currency: session.currency ?? undefined,
       studentNotes: session.studentNotes ?? undefined,
       creatorNotes: session.creatorNotes ?? undefined,
-      startedAt: session.startedAt ?? undefined,
-      endedAt: session.endedAt ?? undefined,
-      createdAt: session.createdAt,
-      updatedAt: session.updatedAt,
     };
   }
 }

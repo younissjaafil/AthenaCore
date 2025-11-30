@@ -28,19 +28,6 @@ export class SessionResponseDto {
   creatorName?: string;
 
   @ApiProperty({
-    description: 'Session title',
-    example: '1-on-1 Coaching Session',
-  })
-  title: string;
-
-  @ApiProperty({
-    description: 'Session description',
-    example: 'Discuss project architecture',
-    required: false,
-  })
-  description?: string;
-
-  @ApiProperty({
     description: 'Scheduled date and time',
     example: '2024-12-01T14:00:00Z',
   })
@@ -108,29 +95,4 @@ export class SessionResponseDto {
   })
   creatorNotes?: string;
 
-  @ApiProperty({
-    description: 'Session start time',
-    example: '2024-12-01T14:00:00Z',
-    required: false,
-  })
-  startedAt?: Date;
-
-  @ApiProperty({
-    description: 'Session end time',
-    example: '2024-12-01T15:00:00Z',
-    required: false,
-  })
-  endedAt?: Date;
-
-  @ApiProperty({
-    description: 'Creation timestamp',
-    example: '2024-11-28T10:00:00Z',
-  })
-  createdAt: Date;
-
-  @ApiProperty({
-    description: 'Last update timestamp',
-    example: '2024-11-28T12:00:00Z',
-  })
-  updatedAt: Date;
 }

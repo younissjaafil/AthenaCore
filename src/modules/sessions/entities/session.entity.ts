@@ -26,9 +26,9 @@ export enum VideoProvider {
 }
 
 @Entity('session')
-@Index(['userId', 'status'])
-@Index(['creatorId', 'status'])
-@Index(['scheduledAt'])
+@Index(['user_id', 'status'])
+@Index(['creator_id', 'status'])
+@Index(['scheduled_time'])
 export class Session {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -47,32 +47,23 @@ export class Session {
   @JoinColumn({ name: 'creator_id' })
   creator: Creator;
 
-  @Column({ type: 'varchar', length: 255 })
-  title: string;
-
-  @Column({ type: 'text', nullable: true })
-  description: string;
-
   @Column({ name: 'scheduled_time', type: 'timestamp' })
   scheduledAt: Date;
 
   @Column({ name: 'duration_minutes', type: 'int' })
   durationMinutes: number;
 
-  @Column({
-    type: 'enum',
-    enum: SessionStatus,
-    default: SessionStatus.PENDING,
-  })
-  status: SessionStatus;
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  price: number;
 
-  @Column({
-    name: 'video_provider',
-    type: 'enum',
-    enum: VideoProvider,
-    default: VideoProvider.JITSI,
-  })
-  videoProvider: VideoProvider;
+  @Column({ type: 'varchar', length: 10, nullable: true })
+  currency: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  status: string;
+
+  @Column({ name: 'video_provider', type: 'varchar', nullable: true })
+  videoProvider: string;
 
   @Column({
     name: 'video_room_url',
@@ -90,34 +81,17 @@ export class Session {
   })
   videoRoomId: string;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
-  price: number;
-
-  @Column({ type: 'varchar', length: 10, nullable: true })
-  currency: string;
-
-  @Column({ name: 'transaction_id', type: 'uuid', nullable: true })
-  transactionId: string;
-
   @Column({ name: 'student_notes', type: 'text', nullable: true })
   studentNotes: string;
 
   @Column({ name: 'creator_notes', type: 'text', nullable: true })
   creatorNotes: string;
 
+  @Column({ name: 'cancellation_reason', type: 'text', nullable: true })
+  cancellationReason: string;
+
   @Column({ type: 'jsonb', nullable: true })
-  metadata: {
-    cancellationReason?: string;
-    cancelledBy?: string;
-    rescheduledFrom?: string;
-    videoProviderData?: any;
-  };
-
-  @Column({ name: 'started_at', type: 'timestamp', nullable: true })
-  startedAt: Date;
-
-  @Column({ name: 'ended_at', type: 'timestamp', nullable: true })
-  endedAt: Date;
+  metadata: Record<string, any>;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

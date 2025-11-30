@@ -22,23 +22,6 @@ export class BookSessionDto {
   creatorId: string;
 
   @ApiProperty({
-    description: 'Session title',
-    example: '1-on-1 Coaching Session',
-  })
-  @IsString()
-  @IsNotEmpty()
-  title: string;
-
-  @ApiProperty({
-    description: 'Session description or agenda',
-    example: 'Discuss project architecture and best practices',
-    required: false,
-  })
-  @IsString()
-  @IsOptional()
-  description?: string;
-
-  @ApiProperty({
     description: 'Scheduled date and time (ISO 8601)',
     example: '2024-12-01T14:00:00Z',
   })
