@@ -290,7 +290,11 @@ export class AvailabilityService {
         }
 
         if (slots.length > 0) {
-          result.push({ date: dateStr, slots });
+          result.push({
+            date: dateStr,
+            slots,
+            timezone: settings.timezone || 'UTC',
+          });
         }
       }
 

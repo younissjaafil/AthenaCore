@@ -127,8 +127,15 @@ export class TimeSlotAvailableDto {
   date: string;
 
   @ApiProperty({
-    description: 'Available time slots for the day',
+    description: 'Available time slots for the day (in creator timezone)',
     example: ['09:00', '10:00', '11:00', '14:00', '15:00'],
   })
   slots: string[];
+
+  @ApiProperty({
+    description: 'Creator timezone (IANA format)',
+    example: 'Asia/Beirut',
+    required: false,
+  })
+  timezone?: string;
 }
