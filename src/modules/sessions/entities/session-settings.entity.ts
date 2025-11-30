@@ -54,7 +54,7 @@ export class SessionSettings {
   pricePerDuration: Record<string, number>;
 
   // Timezone
-  @Column({ type: 'varchar', length: 50, default: 'UTC' })
+  @Column({ type: 'varchar', length: 50, default: 'Asia/Beirut' })
   timezone: string;
 
   // Session welcome message

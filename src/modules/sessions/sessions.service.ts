@@ -129,14 +129,14 @@ export class SessionsService {
     // Verify user is creator or student
     // Check if user is the student (session.userId)
     const isStudent = session.userId === userId;
-    
+
     // Check if user is the creator (need to look up creator by user ID)
     let isCreator = false;
     const creator = await this.creatorsService.findByUserId(userId);
     if (creator && creator.id === session.creatorId) {
       isCreator = true;
     }
-    
+
     if (!isStudent && !isCreator) {
       throw new BadRequestException('Not authorized to update this session');
     }
