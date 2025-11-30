@@ -121,6 +121,14 @@ export class PaymentsService {
       throw new NotFoundException(`Transaction ${transactionId} not found`);
     }
 
+    // If already completed, just return current status
+    if (
+      transaction.status === TransactionStatus.SUCCESS ||
+      transaction.status === TransactionStatus.FAILED
+    ) {
+      return this.mapToResponseDto(transaction);
+    }
+
     // Get status from Whish
     const whishStatus = await this.whishService.getPaymentStatus({
       currency: transaction.currency as unknown as PaymentCurrency,
@@ -157,6 +165,34 @@ export class PaymentsService {
     }
 
     return this.mapToResponseDto(transaction);
+  }
+
+  /**
+   * Get invoice URL and transaction details for opening payment page
+   */
+  async getInvoice(transactionId: string): Promise<{
+    collectUrl: string;
+    transactionId: string;
+    amount: number;
+    currency: string;
+    status: string;
+    agentId?: string;
+  }> {
+    const transaction =
+      await this.transactionsRepository.findById(transactionId);
+
+    if (!transaction) {
+      throw new NotFoundException(`Transaction ${transactionId} not found`);
+    }
+
+    return {
+      collectUrl: transaction.collectUrl,
+      transactionId: transaction.id,
+      amount: transaction.amount,
+      currency: transaction.currency,
+      status: transaction.status,
+      agentId: transaction.agentId ?? undefined,
+    };
   }
 
   /**
@@ -336,6 +372,81 @@ export class PaymentsService {
     this.logger.log(
       `Entitlement granted to user ${userId} for agent ${agentId}`,
     );
+  }
+
+  /**
+   * Sync payment status from Whish API
+   * This is useful when callbacks fail - manually check and update status
+   */
+  async syncPaymentStatus(transactionId: string): Promise<PaymentResponseDto> {
+    const transaction =
+      await this.transactionsRepository.findById(transactionId);
+
+    if (!transaction) {
+      throw new NotFoundException('Transaction not found');
+    }
+
+    // If already completed, just return
+    if (transaction.status === TransactionStatus.SUCCESS) {
+      return this.mapToResponseDto(transaction);
+    }
+
+    // Get status from Whish
+    const whishStatus = await this.whishService.getPaymentStatus({
+      externalId: transaction.externalId,
+      currency: transaction.currency as PaymentCurrency,
+    });
+
+    this.logger.log(
+      `Synced payment status for ${transactionId}: ${whishStatus.collectStatus}`,
+    );
+
+    const newStatus = this.mapWhishStatus(whishStatus.collectStatus);
+
+    // Update transaction
+    await this.transactionsRepository.updateStatus(
+      transactionId,
+      newStatus,
+      whishStatus.payerPhoneNumber,
+    );
+
+    // If success, grant entitlement
+    if (newStatus === TransactionStatus.SUCCESS && transaction.agentId) {
+      await this.grantEntitlement(
+        transaction.userId,
+        transaction.agentId,
+        transactionId,
+      );
+    }
+
+    // Get updated transaction
+    const updated = await this.transactionsRepository.findById(transactionId);
+    return this.mapToResponseDto(updated!);
+  }
+
+  /**
+   * Sync all pending transactions
+   */
+  async syncAllPendingPayments(): Promise<{ synced: number; updated: number }> {
+    const pending = await this.transactionsRepository.findByStatus(
+      TransactionStatus.PENDING,
+    );
+
+    let updated = 0;
+    for (const transaction of pending) {
+      try {
+        const result = await this.syncPaymentStatus(transaction.id);
+        if (result.status !== CollectStatus.PENDING) {
+          updated++;
+        }
+      } catch (error) {
+        this.logger.error(
+          `Failed to sync transaction ${transaction.id}: ${error}`,
+        );
+      }
+    }
+
+    return { synced: pending.length, updated };
   }
 
   /**

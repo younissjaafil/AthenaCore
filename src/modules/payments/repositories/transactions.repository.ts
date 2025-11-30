@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Transaction } from '../entities/transaction.entity';
+import { Transaction, TransactionStatus } from '../entities/transaction.entity';
 
 @Injectable()
 export class TransactionsRepository {
@@ -40,5 +40,30 @@ export class TransactionsRepository {
     const timestamp = Date.now();
     const random = Math.floor(Math.random() * 1000);
     return String(timestamp * 1000 + random);
+  }
+
+  async updateStatus(
+    id: string,
+    status: TransactionStatus,
+    payerPhoneNumber?: string,
+  ): Promise<void> {
+    const updateData: Partial<Transaction> = {
+      status,
+      updatedAt: new Date(),
+    };
+    if (status === TransactionStatus.SUCCESS) {
+      updateData.completedAt = new Date();
+    }
+    if (payerPhoneNumber) {
+      updateData.payerPhoneNumber = payerPhoneNumber;
+    }
+    await this.repository.update(id, updateData);
+  }
+
+  async findByStatus(status: TransactionStatus): Promise<Transaction[]> {
+    return this.repository.find({
+      where: { status },
+      order: { createdAt: 'DESC' },
+    });
   }
 }

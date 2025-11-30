@@ -91,7 +91,8 @@ export class PaymentsController {
   @UseGuards(ClerkAuthGuard)
   @ApiOperation({
     summary: 'Get payment status',
-    description: 'Check the status of a specific payment transaction',
+    description:
+      'Check the status of a specific payment transaction (syncs with Whish)',
   })
   @ApiParam({ name: 'id', description: 'Transaction ID' })
   @ApiResponse({
@@ -103,6 +104,32 @@ export class PaymentsController {
     @Param('id') transactionId: string,
   ): Promise<PaymentResponseDto> {
     return this.paymentsService.getPaymentStatus(transactionId);
+  }
+
+  @Get('transactions/:id/invoice')
+  @ApiBearerAuth()
+  @UseGuards(ClerkAuthGuard)
+  @ApiOperation({
+    summary: 'Get invoice/payment URL',
+    description: 'Get the Whish payment URL to open for a transaction',
+  })
+  @ApiParam({ name: 'id', description: 'Transaction ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Invoice retrieved successfully',
+    schema: {
+      properties: {
+        collectUrl: { type: 'string' },
+        transactionId: { type: 'string' },
+        amount: { type: 'number' },
+        currency: { type: 'string' },
+        status: { type: 'string' },
+        agentId: { type: 'string' },
+      },
+    },
+  })
+  async getInvoice(@Param('id') transactionId: string) {
+    return this.paymentsService.getInvoice(transactionId);
   }
 
   @Get('entitlements')
@@ -183,7 +210,32 @@ export class PaymentsController {
   async syncTransactionStatus(
     @Param('id') transactionId: string,
   ): Promise<PaymentResponseDto> {
-    return this.paymentsService.getPaymentStatus(transactionId);
+    return this.paymentsService.syncPaymentStatus(transactionId);
+  }
+
+  @Post('sync-all-pending')
+  @ApiBearerAuth()
+  @UseGuards(ClerkAuthGuard)
+  @ApiOperation({
+    summary: 'Sync all pending transactions',
+    description:
+      'Check payment status with Whish for all pending transactions and update them.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Transactions synced successfully',
+    schema: {
+      properties: {
+        synced: { type: 'number' },
+        updated: { type: 'number' },
+      },
+    },
+  })
+  async syncAllPendingTransactions(): Promise<{
+    synced: number;
+    updated: number;
+  }> {
+    return this.paymentsService.syncAllPendingPayments();
   }
 
   @Post('callback/success')
