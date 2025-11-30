@@ -119,6 +119,9 @@ export class WhishService {
           ),
         );
 
+      // Log the full response for debugging
+      this.logger.log(`Whish API response: ${JSON.stringify(response.data)}`);
+
       if (!response.data.status) {
         this.logger.error(
           `Whish payment creation failed: ${response.data.code} - ${JSON.stringify(response.data.dialog)}`,
@@ -126,6 +129,17 @@ export class WhishService {
         throw new HttpException(
           response.data.dialog?.message || 'Payment creation failed',
           HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      // Check if data is null or missing collectUrl
+      if (!response.data.data || !response.data.data.collectUrl) {
+        this.logger.error(
+          `Whish returned success but no payment URL. Response: ${JSON.stringify(response.data)}`,
+        );
+        throw new HttpException(
+          'Payment gateway returned invalid response',
+          HttpStatus.SERVICE_UNAVAILABLE,
         );
       }
 

@@ -35,11 +35,10 @@ export class TransactionsRepository {
   }
 
   async getNextExternalId(): Promise<string> {
-    const result = await this.repository
-      .createQueryBuilder('transaction')
-      .select('MAX(CAST(transaction.external_id AS INTEGER))', 'max')
-      .getRawOne<{ max: number }>();
-
-    return String((result?.max || 0) + 1);
+    // Use timestamp + random number to avoid conflicts with previously used IDs
+    // This ensures uniqueness even after database reset
+    const timestamp = Date.now();
+    const random = Math.floor(Math.random() * 1000);
+    return String(timestamp * 1000 + random);
   }
 }
