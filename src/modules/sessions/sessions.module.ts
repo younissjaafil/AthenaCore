@@ -9,6 +9,7 @@ import { SessionSettings } from './entities/session-settings.entity';
 import { User } from '../users/entities/user.entity';
 import { Creator } from '../creators/entities/creator.entity';
 import { UsersModule } from '../users/users.module';
+import { CreatorsModule } from '../creators/creators.module';
 import { AvailabilityController } from './availability.controller';
 import { AvailabilityService } from './availability.service';
 import { AvailabilityRepository } from './repositories/availability.repository';
@@ -23,6 +24,7 @@ import { AvailabilityRepository } from './repositories/availability.repository';
       Creator,
     ]),
     UsersModule,
+    CreatorsModule,
   ],
   controllers: [SessionsController, AvailabilityController],
   providers: [

@@ -2,10 +2,12 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
   Logger,
 } from '@nestjs/common';
 import { AvailabilityRepository } from './repositories/availability.repository';
 import { SessionsRepository } from './repositories/sessions.repository';
+import { CreatorsService } from '../creators/creators.service';
 import {
   SetAvailabilityDto,
   AvailabilityResponseDto,
@@ -29,7 +31,20 @@ export class AvailabilityService {
   constructor(
     private readonly availabilityRepository: AvailabilityRepository,
     private readonly sessionsRepository: SessionsRepository,
+    private readonly creatorsService: CreatorsService,
   ) {}
+
+  /**
+   * Get creator ID from user ID
+   * @throws ForbiddenException if user is not a creator
+   */
+  async getCreatorIdFromUserId(userId: string): Promise<string> {
+    const creator = await this.creatorsService.findByUserId(userId);
+    if (!creator) {
+      throw new ForbiddenException('User is not a creator');
+    }
+    return creator.id;
+  }
 
   /**
    * Set creator's weekly availability (replaces existing)

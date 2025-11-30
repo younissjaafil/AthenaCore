@@ -45,9 +45,11 @@ export class AvailabilityController {
     type: [AvailabilityResponseDto],
   })
   async setAvailability(
-    @CurrentUser('creatorId') creatorId: string,
+    @CurrentUser('sub') userId: string,
     @Body() dto: SetAvailabilityDto,
   ): Promise<AvailabilityResponseDto[]> {
+    const creatorId =
+      await this.availabilityService.getCreatorIdFromUserId(userId);
     return this.availabilityService.setAvailability(creatorId, dto);
   }
 
@@ -61,8 +63,10 @@ export class AvailabilityController {
     type: [AvailabilityResponseDto],
   })
   async getMyAvailability(
-    @CurrentUser('creatorId') creatorId: string,
+    @CurrentUser('sub') userId: string,
   ): Promise<AvailabilityResponseDto[]> {
+    const creatorId =
+      await this.availabilityService.getCreatorIdFromUserId(userId);
     return this.availabilityService.getAvailability(creatorId);
   }
 
@@ -122,8 +126,10 @@ export class AvailabilityController {
     type: SessionSettingsResponseDto,
   })
   async getMySettings(
-    @CurrentUser('creatorId') creatorId: string,
+    @CurrentUser('sub') userId: string,
   ): Promise<SessionSettingsResponseDto> {
+    const creatorId =
+      await this.availabilityService.getCreatorIdFromUserId(userId);
     return this.availabilityService.getSessionSettings(creatorId);
   }
 
@@ -152,9 +158,11 @@ export class AvailabilityController {
     type: SessionSettingsResponseDto,
   })
   async updateMySettings(
-    @CurrentUser('creatorId') creatorId: string,
+    @CurrentUser('sub') userId: string,
     @Body() dto: UpdateSessionSettingsDto,
   ): Promise<SessionSettingsResponseDto> {
+    const creatorId =
+      await this.availabilityService.getCreatorIdFromUserId(userId);
     return this.availabilityService.updateSessionSettings(creatorId, dto);
   }
 }
