@@ -33,18 +33,18 @@ export class Session {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'uuid' })
+  @Column({ name: 'user_id', type: 'uuid' })
   userId: string;
 
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'userId' })
+  @JoinColumn({ name: 'user_id' })
   user: User;
 
-  @Column({ type: 'uuid' })
+  @Column({ name: 'creator_id', type: 'uuid' })
   creatorId: string;
 
   @ManyToOne(() => Creator, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'creatorId' })
+  @JoinColumn({ name: 'creator_id' })
   creator: Creator;
 
   @Column({ type: 'varchar', length: 255 })
@@ -53,10 +53,10 @@ export class Session {
   @Column({ type: 'text', nullable: true })
   description: string;
 
-  @Column({ type: 'timestamp' })
+  @Column({ name: 'scheduled_time', type: 'timestamp' })
   scheduledAt: Date;
 
-  @Column({ type: 'int' })
+  @Column({ name: 'duration_minutes', type: 'int' })
   durationMinutes: number;
 
   @Column({
@@ -67,16 +67,27 @@ export class Session {
   status: SessionStatus;
 
   @Column({
+    name: 'video_provider',
     type: 'enum',
     enum: VideoProvider,
     default: VideoProvider.JITSI,
   })
   videoProvider: VideoProvider;
 
-  @Column({ type: 'varchar', length: 500, nullable: true })
+  @Column({
+    name: 'video_room_url',
+    type: 'varchar',
+    length: 500,
+    nullable: true,
+  })
   videoRoomUrl: string;
 
-  @Column({ type: 'varchar', length: 255, nullable: true })
+  @Column({
+    name: 'video_room_id',
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+  })
   videoRoomId: string;
 
   @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
@@ -85,13 +96,13 @@ export class Session {
   @Column({ type: 'varchar', length: 10, nullable: true })
   currency: string;
 
-  @Column({ type: 'uuid', nullable: true })
+  @Column({ name: 'transaction_id', type: 'uuid', nullable: true })
   transactionId: string;
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ name: 'student_notes', type: 'text', nullable: true })
   studentNotes: string;
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ name: 'creator_notes', type: 'text', nullable: true })
   creatorNotes: string;
 
   @Column({ type: 'jsonb', nullable: true })
@@ -102,15 +113,15 @@ export class Session {
     videoProviderData?: any;
   };
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ name: 'started_at', type: 'timestamp', nullable: true })
   startedAt: Date;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ name: 'ended_at', type: 'timestamp', nullable: true })
   endedAt: Date;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 }
