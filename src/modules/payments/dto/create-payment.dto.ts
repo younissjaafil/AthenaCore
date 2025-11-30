@@ -41,7 +41,7 @@ export class CreatePaymentDto {
 
   @ApiPropertyOptional({
     description: 'Success callback URL (GET)',
-    example: 'https://athena-ai.pro/api/payments/callback/success',
+    example: 'https://athena-ai.pro/api/payment/success',
   })
   @IsOptional()
   @IsUrl()
@@ -49,7 +49,7 @@ export class CreatePaymentDto {
 
   @ApiPropertyOptional({
     description: 'Failure callback URL (GET)',
-    example: 'https://athena-ai.pro/api/payments/callback/failure',
+    example: 'https://athena-ai.pro/api/payment/failure',
   })
   @IsOptional()
   @IsUrl()

@@ -17,6 +17,7 @@ async function bootstrap() {
       'http://localhost:4000',
       'https://athena-front-beta.vercel.app',
       'https://athena-ai.pro',
+      'https://www.athena-ai.pro',
       process.env.CORS_ORIGIN,
     ].filter(Boolean),
     credentials: true,
