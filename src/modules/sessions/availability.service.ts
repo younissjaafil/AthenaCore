@@ -116,6 +116,12 @@ export class AvailabilityService {
       await this.availabilityRepository.getOrCreateSettings(creatorId);
     const availability =
       await this.availabilityRepository.findActiveByCreator(creatorId);
+    const dateOverrides =
+      await this.availabilityRepository.findDateOverridesInRange(
+        creatorId,
+        startDate,
+        endDate,
+      );
 
     this.logger.log(
       `getAvailableSlots: creatorId=${creatorId}, startDate=${startDate}, endDate=${endDate}, duration=${durationMinutes}`,
@@ -123,11 +129,28 @@ export class AvailabilityService {
     this.logger.log(
       `Settings: minimumNoticeHours=${settings.minimumNoticeHours}, bufferTime=${settings.bufferTime}`,
     );
-    this.logger.log(`Availability slots found: ${availability.length}`);
+    this.logger.log(
+      `Weekly availability slots: ${availability.length}, Date overrides: ${dateOverrides.length}`,
+    );
 
-    if (availability.length === 0) {
-      this.logger.warn('No availability slots found for creator');
-      return [];
+    // Create a map of date overrides for quick lookup
+    const overrideMap = new Map<
+      string,
+      { isAvailable: boolean; slots: { start: string; end: string }[] }
+    >();
+    for (const override of dateOverrides) {
+      const dateKey = override.date;
+      if (!overrideMap.has(dateKey)) {
+        overrideMap.set(dateKey, { isAvailable: true, slots: [] });
+      }
+      const entry = overrideMap.get(dateKey)!;
+
+      if (!override.isAvailable) {
+        // If any override blocks the day, mark as unavailable
+        entry.isAvailable = false;
+      } else if (override.startTime && override.endTime) {
+        entry.slots.push({ start: override.startTime, end: override.endTime });
+      }
     }
 
     // Get existing sessions in the date range
@@ -153,24 +176,48 @@ export class AvailabilityService {
     );
 
     while (currentDate <= end) {
+      const dateStr = currentDate.toISOString().split('T')[0];
       const dayOfWeek = currentDate.getDay() as DayOfWeek;
-      const dayAvailability = availability.filter(
-        (a) => a.dayOfWeek === dayOfWeek,
-      );
+      const override = overrideMap.get(dateStr);
+
+      // Check if this date has an override
+      let dayAvailabilityRanges: { start: string; end: string }[] = [];
+
+      if (override) {
+        if (!override.isAvailable) {
+          // Date is blocked, skip
+          this.logger.debug(`${dateStr} is blocked by override`);
+          currentDate.setDate(currentDate.getDate() + 1);
+          continue;
+        }
+        // Use override slots instead of weekly availability
+        dayAvailabilityRanges = override.slots;
+        this.logger.debug(
+          `${dateStr} has ${override.slots.length} override slots`,
+        );
+      } else {
+        // Use weekly availability
+        const dayAvailability = availability.filter(
+          (a) => a.dayOfWeek === dayOfWeek,
+        );
+        dayAvailabilityRanges = dayAvailability.map((a) => ({
+          start: a.startTime,
+          end: a.endTime,
+        }));
+      }
 
       this.logger.debug(
-        `Checking ${currentDate.toISOString().split('T')[0]}, dayOfWeek=${dayOfWeek}, matchingSlots=${dayAvailability.length}`,
+        `Checking ${dateStr}, dayOfWeek=${dayOfWeek}, ranges=${dayAvailabilityRanges.length}`,
       );
 
-      if (dayAvailability.length > 0) {
-        const dateStr = currentDate.toISOString().split('T')[0];
+      if (dayAvailabilityRanges.length > 0) {
         const slots: string[] = [];
 
-        for (const avail of dayAvailability) {
+        for (const range of dayAvailabilityRanges) {
           const timeSlots = this.generateTimeSlots(
             dateStr,
-            avail.startTime,
-            avail.endTime,
+            range.start,
+            range.end,
             durationMinutes,
             settings.bufferTime,
           );
@@ -323,5 +370,35 @@ export class AvailabilityService {
       welcomeMessage: settings.welcomeMessage ?? undefined,
       cancellationPolicy: settings.cancellationPolicy ?? undefined,
     };
+  }
+
+  /**
+   * Get date overrides for a creator
+   */
+  async getDateOverrides(creatorId: string) {
+    return this.availabilityRepository.findDateOverrides(creatorId);
+  }
+
+  /**
+   * Set date overrides (replaces existing)
+   */
+  async setDateOverrides(
+    creatorId: string,
+    overrides: {
+      date: string;
+      startTime?: string;
+      endTime?: string;
+      isAvailable: boolean;
+    }[],
+  ) {
+    const data = overrides.map((o) => ({
+      creatorId,
+      date: o.date,
+      startTime: o.isAvailable ? o.startTime : null,
+      endTime: o.isAvailable ? o.endTime : null,
+      isAvailable: o.isAvailable,
+    }));
+
+    return this.availabilityRepository.setDateOverrides(creatorId, data);
   }
 }
