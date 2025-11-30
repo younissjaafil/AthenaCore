@@ -127,7 +127,7 @@ export class AvailabilityService {
       `getAvailableSlots: creatorId=${creatorId}, startDate=${startDate}, endDate=${endDate}, duration=${durationMinutes}`,
     );
     this.logger.log(
-      `Settings: minimumNoticeHours=${settings.minimumNoticeHours}, bufferTime=${settings.bufferTime}`,
+      `Settings: minimumNoticeHours=${settings.minimumNoticeHours}, bufferTime=${settings.bufferTime}, timezone=${settings.timezone}`,
     );
     this.logger.log(
       `Weekly availability slots: ${availability.length}, Date overrides: ${dateOverrides.length}`,
@@ -243,10 +243,17 @@ export class AvailabilityService {
           );
 
           for (const slot of timeSlots) {
-            const slotDate = new Date(`${dateStr}T${slot}:00`);
+            // Create slot date in creator's timezone
+            // The slot time (e.g., "02:00") is in the creator's local timezone
+            // We need to convert it to UTC for comparison
+            const slotDate = this.createDateInTimezone(
+              dateStr,
+              slot,
+              settings.timezone || 'UTC',
+            );
 
             this.logger.log(
-              `Checking slot ${slot}: slotDate=${slotDate.toISOString()}, minimumNotice=${minimumNotice.toISOString()}`,
+              `Checking slot ${slot}: slotDate=${slotDate.toISOString()}, minimumNotice=${minimumNotice.toISOString()}, timezone=${settings.timezone}`,
             );
 
             // Skip if before minimum notice
@@ -433,5 +440,69 @@ export class AvailabilityService {
     }));
 
     return this.availabilityRepository.setDateOverrides(creatorId, data);
+  }
+
+  /**
+   * Create a Date object interpreting a date/time string in a specific timezone
+   * @param dateStr Date string in YYYY-MM-DD format
+   * @param timeStr Time string in HH:MM format
+   * @param timezone IANA timezone string (e.g., 'Asia/Beirut', 'UTC')
+   * @returns Date object in UTC
+   */
+  private createDateInTimezone(
+    dateStr: string,
+    timeStr: string,
+    timezone: string,
+  ): Date {
+    // Get timezone offset for the given date
+    // Create a date at midnight UTC, then format in the target timezone
+    const targetDate = new Date(`${dateStr}T${timeStr}:00Z`);
+
+    try {
+      // Get the offset by comparing UTC time with formatted local time
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: timezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+      });
+
+      // Parse the time parts
+      const [hours, minutes] = timeStr.split(':').map(Number);
+
+      // Create a test date to find the offset
+      const testDate = new Date(`${dateStr}T12:00:00Z`); // Use noon to avoid DST edge cases
+      const parts = formatter.formatToParts(testDate);
+      const tzHour = parseInt(
+        parts.find((p) => p.type === 'hour')?.value || '12',
+      );
+
+      // Calculate offset: if timezone is UTC+2, noon UTC shows as 14:00 local
+      // So offset = local - UTC = 14 - 12 = 2 hours
+      const offsetHours = tzHour - 12;
+
+      // Now create the correct UTC date
+      // If user wants 02:00 in Lebanon (UTC+2), the UTC time is 00:00
+      const utcHours = hours - offsetHours;
+      const result = new Date(
+        `${dateStr}T${utcHours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:00Z`,
+      );
+
+      this.logger.debug(
+        `createDateInTimezone: ${dateStr} ${timeStr} in ${timezone} -> UTC ${result.toISOString()} (offset=${offsetHours}h)`,
+      );
+
+      return result;
+    } catch (error) {
+      // Fallback: just use the naive date (treat as UTC)
+      this.logger.warn(
+        `Failed to parse timezone ${timezone}, falling back to UTC`,
+      );
+      return new Date(`${dateStr}T${timeStr}:00Z`);
+    }
   }
 }
