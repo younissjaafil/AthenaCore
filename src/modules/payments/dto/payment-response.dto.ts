@@ -50,9 +50,9 @@ export class PaymentResponseDto {
 
   @ApiProperty({
     description: 'External ID for tracking',
-    example: 12345,
+    example: '12345',
   })
-  externalId: number;
+  externalId: string;
 
   @ApiProperty({
     description: 'Payment invoice/description',

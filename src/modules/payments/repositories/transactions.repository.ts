@@ -19,7 +19,7 @@ export class TransactionsRepository {
     return this.repository.findOne({ where: { id } });
   }
 
-  async findByExternalId(externalId: number): Promise<Transaction | null> {
+  async findByExternalId(externalId: string): Promise<Transaction | null> {
     return this.repository.findOne({ where: { externalId } });
   }
 
@@ -34,12 +34,12 @@ export class TransactionsRepository {
     await this.repository.update(id, data);
   }
 
-  async getNextExternalId(): Promise<number> {
+  async getNextExternalId(): Promise<string> {
     const result = await this.repository
       .createQueryBuilder('transaction')
-      .select('MAX(transaction.externalId)', 'max')
+      .select('MAX(CAST(transaction.external_id AS INTEGER))', 'max')
       .getRawOne<{ max: number }>();
 
-    return (result?.max || 0) + 1;
+    return String((result?.max || 0) + 1);
   }
 }

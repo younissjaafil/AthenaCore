@@ -172,15 +172,12 @@ export class PaymentsController {
     summary: 'Payment success callback',
     description: 'Webhook endpoint for successful payment notifications',
   })
-  @ApiQuery({ name: 'externalId', type: 'number' })
+  @ApiQuery({ name: 'externalId', type: 'string' })
   @ApiResponse({ status: 200, description: 'Callback processed' })
   async handleSuccessCallback(
     @Query('externalId') externalId: string,
   ): Promise<{ message: string }> {
-    await this.paymentsService.handlePaymentCallback(
-      parseInt(externalId, 10),
-      'success',
-    );
+    await this.paymentsService.handlePaymentCallback(externalId, 'success');
     return { message: 'Payment successful' };
   }
 
@@ -190,15 +187,12 @@ export class PaymentsController {
     summary: 'Payment failure callback',
     description: 'Webhook endpoint for failed payment notifications',
   })
-  @ApiQuery({ name: 'externalId', type: 'number' })
+  @ApiQuery({ name: 'externalId', type: 'string' })
   @ApiResponse({ status: 200, description: 'Callback processed' })
   async handleFailureCallback(
     @Query('externalId') externalId: string,
   ): Promise<{ message: string }> {
-    await this.paymentsService.handlePaymentCallback(
-      parseInt(externalId, 10),
-      'failure',
-    );
+    await this.paymentsService.handlePaymentCallback(externalId, 'failure');
     return { message: 'Payment failed' };
   }
 }

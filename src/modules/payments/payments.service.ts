@@ -16,7 +16,6 @@ import {
   Transaction,
   TransactionType,
   TransactionStatus,
-  Currency,
 } from './entities/transaction.entity';
 import { AgentsService } from '../agents/agents.service';
 
@@ -85,13 +84,14 @@ export class PaymentsService {
       userId,
       agentId,
       externalId,
-      type: TransactionType.AGENT_PURCHASE,
       amount: dto.amount,
-      currency: dto.currency as unknown as Currency,
+      currency: dto.currency,
       status: TransactionStatus.PENDING,
-      invoice: dto.invoice,
+      paymentMethod: 'whish',
       collectUrl: whishResponse.collectUrl,
       metadata: {
+        type: TransactionType.AGENT_PURCHASE,
+        invoice: dto.invoice,
         successCallbackUrl,
         failureCallbackUrl,
         successRedirectUrl,
@@ -210,7 +210,9 @@ export class PaymentsService {
         pricePerConversation: agent.pricePerConversation,
       };
     } catch (error) {
-      this.logger.error(`Error checking agent access: ${error.message}`);
+      this.logger.error(
+        `Error checking agent access: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
       return { hasAccess: false };
     }
   }
@@ -234,7 +236,7 @@ export class PaymentsService {
    * Handle payment callback (webhook)
    */
   async handlePaymentCallback(
-    externalId: number,
+    externalId: string,
     status: 'success' | 'failure',
   ): Promise<void> {
     const transaction =
@@ -323,6 +325,7 @@ export class PaymentsService {
    * Map transaction entity to response DTO
    */
   private mapToResponseDto(transaction: Transaction): PaymentResponseDto {
+    const metadata = transaction.metadata as { invoice?: string } | undefined;
     return {
       id: transaction.id,
       userId: transaction.userId,
@@ -332,7 +335,7 @@ export class PaymentsService {
       status: transaction.status as unknown as CollectStatus,
       collectUrl: transaction.collectUrl,
       externalId: transaction.externalId,
-      invoice: transaction.invoice,
+      invoice: metadata?.invoice || '',
       payerPhoneNumber: transaction.payerPhoneNumber ?? undefined,
       createdAt: transaction.createdAt,
       updatedAt: transaction.updatedAt,

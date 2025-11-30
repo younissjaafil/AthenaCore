@@ -74,7 +74,7 @@ export class CreatePaymentDto {
 
 export class WhishPaymentRequest extends CreatePaymentDto {
   @ApiProperty({ description: 'External transaction ID' })
-  externalId: number;
+  externalId: string;
 }
 
 export class WhishPaymentResponseDto {

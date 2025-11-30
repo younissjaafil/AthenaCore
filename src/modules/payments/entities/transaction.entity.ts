@@ -38,50 +38,59 @@ export class Transaction {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'uuid' })
+  @Column({ name: 'user_id', type: 'uuid' })
   userId: string;
 
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'userId' })
+  @JoinColumn({ name: 'user_id' })
   user: User;
 
-  @Column({ type: 'uuid', nullable: true })
+  @Column({ name: 'agent_id', type: 'uuid', nullable: true })
   agentId: string;
 
   @ManyToOne(() => Agent, { onDelete: 'SET NULL', nullable: true })
-  @JoinColumn({ name: 'agentId' })
+  @JoinColumn({ name: 'agent_id' })
   agent: Agent;
 
-  @Column({ type: 'bigint', unique: true })
-  externalId: number;
-
-  @Column({ type: 'enum', enum: TransactionType })
-  type: TransactionType;
+  @Column({ name: 'external_id', type: 'varchar', unique: true })
+  externalId: string;
 
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   amount: number;
 
-  @Column({ type: 'enum', enum: Currency })
-  currency: Currency;
+  @Column({ type: 'varchar', length: 3, default: 'LBP' })
+  currency: string;
 
   @Column({
-    type: 'enum',
-    enum: TransactionStatus,
+    type: 'varchar',
     default: TransactionStatus.PENDING,
   })
   status: TransactionStatus;
 
-  @Column({ type: 'text' })
-  invoice: string;
+  @Column({ name: 'payment_method', type: 'varchar', nullable: true })
+  paymentMethod: string;
 
-  @Column({ type: 'varchar', length: 500 })
+  @Column({ name: 'payment_url', type: 'varchar', nullable: true })
   collectUrl: string;
 
-  @Column({ type: 'varchar', length: 20, nullable: true })
+  @Column({ name: 'payer_name', type: 'varchar', nullable: true })
+  payerName: string;
+
+  @Column({ name: 'payer_email', type: 'varchar', nullable: true })
+  payerEmail: string;
+
+  @Column({
+    name: 'payer_phone_number',
+    type: 'varchar',
+    length: 20,
+    nullable: true,
+  })
   payerPhoneNumber: string;
 
   @Column({ type: 'jsonb', nullable: true })
   metadata: {
+    type?: TransactionType;
+    invoice?: string;
     successCallbackUrl?: string;
     failureCallbackUrl?: string;
     successRedirectUrl?: string;
@@ -89,12 +98,12 @@ export class Transaction {
     whishResponse?: any;
   };
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ name: 'completed_at', type: 'timestamp', nullable: true })
   completedAt: Date;
 }

@@ -1,4 +1,4 @@
-import { IsEnum, IsNumber } from 'class-validator';
+import { IsEnum, IsString } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { PaymentCurrency } from './create-payment.dto';
 
@@ -19,10 +19,10 @@ export class GetPaymentStatusDto {
 
   @ApiProperty({
     description: 'External transaction ID',
-    example: 12345,
+    example: '12345',
   })
-  @IsNumber()
-  externalId: number;
+  @IsString()
+  externalId: string;
 }
 
 export class WhishStatusResponseDto {
