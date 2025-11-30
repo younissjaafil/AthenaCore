@@ -228,6 +228,9 @@ export class AvailabilityService {
         const slots: string[] = [];
 
         for (const range of dayAvailabilityRanges) {
+          this.logger.log(
+            `Generating slots for ${dateStr}: range ${range.start} - ${range.end}, duration=${durationMinutes}, buffer=${settings.bufferTime}`,
+          );
           const timeSlots = this.generateTimeSlots(
             dateStr,
             range.start,
@@ -235,12 +238,20 @@ export class AvailabilityService {
             durationMinutes,
             settings.bufferTime,
           );
+          this.logger.log(
+            `Generated ${timeSlots.length} time slots: ${timeSlots.join(', ')}`,
+          );
 
           for (const slot of timeSlots) {
             const slotDate = new Date(`${dateStr}T${slot}:00`);
 
+            this.logger.log(
+              `Checking slot ${slot}: slotDate=${slotDate.toISOString()}, minimumNotice=${minimumNotice.toISOString()}`,
+            );
+
             // Skip if before minimum notice
             if (slotDate < minimumNotice) {
+              this.logger.log(`Slot ${slot} skipped: before minimum notice`);
               continue;
             }
 
@@ -334,22 +345,28 @@ export class AvailabilityService {
     buffer: number,
   ): string[] {
     const slots: string[] = [];
+    // Handle both HH:MM and HH:MM:SS formats
     const [startHour, startMin] = startTime.split(':').map(Number);
     const [endHour, endMin] = endTime.split(':').map(Number);
 
     const startMinutes = startHour * 60 + startMin;
     const endMinutes = endHour * 60 + endMin;
 
+    this.logger.debug(
+      `generateTimeSlots: start=${startTime} (${startMinutes}min), end=${endTime} (${endMinutes}min), duration=${duration}, buffer=${buffer}`,
+    );
+
     let currentMinutes = startMinutes;
     while (currentMinutes + duration <= endMinutes) {
       const hours = Math.floor(currentMinutes / 60);
       const mins = currentMinutes % 60;
-      slots.push(
-        `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`,
-      );
+      const slot = `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+      this.logger.debug(`Adding slot: ${slot} (current=${currentMinutes}, next=${currentMinutes + duration + buffer})`);
+      slots.push(slot);
       currentMinutes += duration + buffer;
     }
 
+    this.logger.debug(`Generated ${slots.length} slots: ${slots.join(', ')}`);
     return slots;
   }
 
