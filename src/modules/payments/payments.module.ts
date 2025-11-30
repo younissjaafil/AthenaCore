@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { HttpModule } from '@nestjs/axios';
 import { PaymentsController } from './payments.controller';
@@ -10,6 +10,7 @@ import { Transaction } from './entities/transaction.entity';
 import { Entitlement } from './entities/entitlement.entity';
 import { Agent } from '../agents/entities/agent.entity';
 import { UsersModule } from '../users/users.module';
+import { AgentsModule } from '../agents/agents.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { UsersModule } from '../users/users.module';
       maxRedirects: 5,
     }),
     UsersModule,
+    forwardRef(() => AgentsModule),
   ],
   controllers: [PaymentsController],
   providers: [

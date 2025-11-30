@@ -138,7 +138,8 @@ export class PaymentsController {
   @UseGuards(ClerkAuthGuard)
   @ApiOperation({
     summary: 'Check agent access',
-    description: 'Check if user has access to a specific agent',
+    description:
+      'Check if user has access to a specific agent and return pricing info',
   })
   @ApiParam({ name: 'agentId', description: 'Agent ID' })
   @ApiResponse({
@@ -147,18 +148,22 @@ export class PaymentsController {
     schema: {
       properties: {
         hasAccess: { type: 'boolean' },
+        isFree: { type: 'boolean' },
+        pricePerMessage: { type: 'number' },
+        pricePerConversation: { type: 'number' },
       },
     },
   })
   async checkAgentAccess(
     @CurrentUser('sub') userId: string,
     @Param('agentId') agentId: string,
-  ): Promise<{ hasAccess: boolean }> {
-    const hasAccess = await this.paymentsService.canAccessAgent(
-      userId,
-      agentId,
-    );
-    return { hasAccess };
+  ): Promise<{
+    hasAccess: boolean;
+    isFree?: boolean;
+    pricePerMessage?: number;
+    pricePerConversation?: number;
+  }> {
+    return this.paymentsService.checkAgentAccess(userId, agentId);
   }
 
   @Post('callback/success')

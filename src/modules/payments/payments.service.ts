@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  Logger,
+  Inject,
+  forwardRef,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { TransactionsRepository } from './repositories/transactions.repository';
 import { EntitlementsRepository } from './repositories/entitlements.repository';
@@ -12,6 +18,7 @@ import {
   TransactionStatus,
   Currency,
 } from './entities/transaction.entity';
+import { AgentsService } from '../agents/agents.service';
 
 @Injectable()
 export class PaymentsService {
@@ -22,6 +29,8 @@ export class PaymentsService {
     private readonly transactionsRepository: TransactionsRepository,
     private readonly entitlementsRepository: EntitlementsRepository,
     private readonly whishService: WhishService,
+    @Inject(forwardRef(() => AgentsService))
+    private readonly agentsService: AgentsService,
   ) {}
 
   /**
@@ -160,6 +169,50 @@ export class PaymentsService {
    */
   async canAccessAgent(userId: string, agentId: string): Promise<boolean> {
     return this.entitlementsRepository.hasAccess(userId, agentId);
+  }
+
+  /**
+   * Check agent access with full pricing info
+   */
+  async checkAgentAccess(
+    userId: string,
+    agentId: string,
+  ): Promise<{
+    hasAccess: boolean;
+    isFree?: boolean;
+    pricePerMessage?: number;
+    pricePerConversation?: number;
+  }> {
+    try {
+      // Get agent info
+      const agent = await this.agentsService.findOne(agentId);
+
+      // If agent is free, always has access
+      if (agent.isFree) {
+        return {
+          hasAccess: true,
+          isFree: true,
+          pricePerMessage: 0,
+          pricePerConversation: 0,
+        };
+      }
+
+      // Check if user has entitlement
+      const hasAccess = await this.entitlementsRepository.hasAccess(
+        userId,
+        agentId,
+      );
+
+      return {
+        hasAccess,
+        isFree: false,
+        pricePerMessage: agent.pricePerMessage,
+        pricePerConversation: agent.pricePerConversation,
+      };
+    } catch (error) {
+      this.logger.error(`Error checking agent access: ${error.message}`);
+      return { hasAccess: false };
+    }
   }
 
   /**
