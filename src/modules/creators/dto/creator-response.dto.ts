@@ -8,6 +8,9 @@ export class CreatorResponseDto {
   @ApiProperty()
   userId: string;
 
+  @ApiProperty()
+  title: string;
+
   @ApiPropertyOptional()
   bio?: string;
 

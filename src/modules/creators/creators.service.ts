@@ -107,6 +107,7 @@ export class CreatorsService {
     const response: CreatorResponseDto = {
       id: creator.id,
       userId: creator.userId,
+      title: creator.title,
       bio: creator.bio,
       tagline: creator.tagline,
       specialties: creator.specialties,
