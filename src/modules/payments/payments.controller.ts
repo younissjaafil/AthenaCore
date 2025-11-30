@@ -166,6 +166,26 @@ export class PaymentsController {
     return this.paymentsService.checkAgentAccess(userId, agentId);
   }
 
+  @Post('transactions/:id/sync')
+  @ApiBearerAuth()
+  @UseGuards(ClerkAuthGuard)
+  @ApiOperation({
+    summary: 'Sync transaction status',
+    description:
+      'Check payment status with Whish and update transaction. Grants entitlement if successful.',
+  })
+  @ApiParam({ name: 'id', description: 'Transaction ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Transaction synced successfully',
+    type: PaymentResponseDto,
+  })
+  async syncTransactionStatus(
+    @Param('id') transactionId: string,
+  ): Promise<PaymentResponseDto> {
+    return this.paymentsService.getPaymentStatus(transactionId);
+  }
+
   @Post('callback/success')
   @Public()
   @ApiOperation({
