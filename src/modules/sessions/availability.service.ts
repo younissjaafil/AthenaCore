@@ -139,7 +139,16 @@ export class AvailabilityService {
       { isAvailable: boolean; slots: { start: string; end: string }[] }
     >();
     for (const override of dateOverrides) {
-      const dateKey = override.date;
+      // Handle both Date objects and strings from database
+      const dateKey =
+        override.date instanceof Date
+          ? override.date.toISOString().split('T')[0]
+          : String(override.date).split('T')[0];
+
+      this.logger.log(
+        `Processing override: date=${override.date}, dateKey=${dateKey}, isAvailable=${override.isAvailable}, start=${override.startTime}, end=${override.endTime}`,
+      );
+
       if (!overrideMap.has(dateKey)) {
         overrideMap.set(dateKey, { isAvailable: true, slots: [] });
       }
@@ -152,6 +161,10 @@ export class AvailabilityService {
         entry.slots.push({ start: override.startTime, end: override.endTime });
       }
     }
+
+    this.logger.log(
+      `Override map keys: ${Array.from(overrideMap.keys()).join(', ')}`,
+    );
 
     // Get existing sessions in the date range
     const start = new Date(startDate);
