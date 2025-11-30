@@ -26,9 +26,9 @@ export enum VideoProvider {
 }
 
 @Entity('session')
-@Index(['user_id', 'status'])
-@Index(['creator_id', 'status'])
-@Index(['scheduled_time'])
+@Index(['userId', 'status'])
+@Index(['creatorId', 'status'])
+@Index(['scheduledAt'])
 export class Session {
   @PrimaryGeneratedColumn('uuid')
   id: string;
