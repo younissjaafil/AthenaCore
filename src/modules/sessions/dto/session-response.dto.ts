@@ -28,6 +28,13 @@ export class SessionResponseDto {
   creatorName?: string;
 
   @ApiProperty({
+    description: 'Student name',
+    example: 'Jane Doe',
+    required: false,
+  })
+  studentName?: string;
+
+  @ApiProperty({
     description: 'Scheduled date and time',
     example: '2024-12-01T14:00:00Z',
   })

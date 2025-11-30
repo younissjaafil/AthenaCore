@@ -18,14 +18,14 @@ export class SessionsRepository {
   async findById(id: string): Promise<Session | null> {
     return this.repository.findOne({
       where: { id },
-      relations: ['user', 'creator'],
+      relations: ['user', 'creator', 'creator.user'],
     });
   }
 
   async findByUser(userId: string): Promise<Session[]> {
     return this.repository.find({
       where: { userId },
-      relations: ['creator'],
+      relations: ['creator', 'creator.user'],
       order: { scheduledAt: 'DESC' },
     });
   }
@@ -33,7 +33,7 @@ export class SessionsRepository {
   async findByCreator(creatorId: string): Promise<Session[]> {
     return this.repository.find({
       where: { creatorId },
-      relations: ['user'],
+      relations: ['user', 'creator', 'creator.user'],
       order: { scheduledAt: 'DESC' },
     });
   }
@@ -46,7 +46,7 @@ export class SessionsRepository {
         scheduledAt: MoreThan(now),
         status: SessionStatus.CONFIRMED,
       },
-      relations: ['creator'],
+      relations: ['creator', 'creator.user'],
       order: { scheduledAt: 'ASC' },
     });
   }

@@ -135,7 +135,9 @@ export class SessionsService {
 
     // Generate video room URL when confirming
     if (dto.status === SessionStatus.CONFIRMED && !session.videoRoomUrl) {
-      const videoData = this.generateVideoRoom(session.videoProvider as VideoProvider);
+      const videoData = this.generateVideoRoom(
+        session.videoProvider as VideoProvider,
+      );
       updates.videoRoomUrl = videoData.url;
       updates.videoRoomId = videoData.roomId;
     }
@@ -261,6 +263,9 @@ export class SessionsService {
       creatorId: session.creatorId,
       creatorName: session.creator?.user?.firstName
         ? `${session.creator.user.firstName} ${session.creator.user.lastName || ''}`.trim()
+        : undefined,
+      studentName: session.user?.firstName
+        ? `${session.user.firstName} ${session.user.lastName || ''}`.trim()
         : undefined,
       scheduledAt: session.scheduledAt,
       durationMinutes: session.durationMinutes,
