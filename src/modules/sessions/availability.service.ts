@@ -140,9 +140,10 @@ export class AvailabilityService {
     >();
     for (const override of dateOverrides) {
       // Handle both Date objects and strings from database
+      const rawDate = override.date as unknown;
       const dateKey =
-        override.date instanceof Date
-          ? override.date.toISOString().split('T')[0]
+        rawDate instanceof Date
+          ? rawDate.toISOString().split('T')[0]
           : String(override.date).split('T')[0];
 
       this.logger.log(
