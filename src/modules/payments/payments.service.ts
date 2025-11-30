@@ -502,6 +502,9 @@ export class PaymentsService {
 
     // If success, mark session as paid for session payments
     if (newStatus === TransactionStatus.SUCCESS && transaction.sessionId) {
+      this.logger.log(
+        `Marking session ${transaction.sessionId} as paid with transaction ${transactionId}`,
+      );
       await this.sessionsService.markSessionAsPaid(
         transaction.sessionId,
         transactionId,
@@ -521,11 +524,24 @@ export class PaymentsService {
       TransactionStatus.PENDING,
     );
 
+    this.logger.log(
+      `Syncing ${pending.length} pending transactions. SessionIds: ${pending
+        .map((t) => t.sessionId)
+        .filter(Boolean)
+        .join(', ')}`,
+    );
+
     let updated = 0;
     for (const transaction of pending) {
       try {
+        this.logger.log(
+          `Syncing transaction ${transaction.id}, sessionId: ${transaction.sessionId}, agentId: ${transaction.agentId}`,
+        );
         const result = await this.syncPaymentStatus(transaction.id);
         if (result.status !== CollectStatus.PENDING) {
+          this.logger.log(
+            `Transaction ${transaction.id} updated to status: ${result.status}`,
+          );
           updated++;
         }
       } catch (error) {
