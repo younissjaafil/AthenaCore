@@ -821,3 +821,4 @@ UNLICENSED - Private project
 ---
 
 **Built with ❤️ for Athena v1**
+# Phase 6 - Sessions & Availability
