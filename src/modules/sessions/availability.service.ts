@@ -76,6 +76,15 @@ export class AvailabilityService {
       })),
     );
 
+    // Auto-set creator as available when they have availability slots
+    if (availabilities.length > 0) {
+      try {
+        await this.creatorsService.update(creatorId, { isAvailable: true });
+      } catch (error) {
+        this.logger.warn(`Failed to update creator availability status: ${error}`);
+      }
+    }
+
     this.logger.log(
       `Set ${availabilities.length} availability slots for creator ${creatorId}`,
     );
