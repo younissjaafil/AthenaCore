@@ -491,11 +491,19 @@ export class PaymentsService {
       whishStatus.payerPhoneNumber,
     );
 
-    // If success, grant entitlement
+    // If success, grant entitlement for agent payments
     if (newStatus === TransactionStatus.SUCCESS && transaction.agentId) {
       await this.grantEntitlement(
         transaction.userId,
         transaction.agentId,
+        transactionId,
+      );
+    }
+
+    // If success, mark session as paid for session payments
+    if (newStatus === TransactionStatus.SUCCESS && transaction.sessionId) {
+      await this.sessionsService.markSessionAsPaid(
+        transaction.sessionId,
         transactionId,
       );
     }
