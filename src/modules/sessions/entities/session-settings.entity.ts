@@ -34,7 +34,7 @@ export class SessionSettings {
   bufferTime: number;
 
   // Minimum notice for booking (in hours)
-  @Column({ type: 'int', default: 24 })
+  @Column({ type: 'int', default: 1 })
   minimumNoticeHours: number;
 
   // Maximum advance booking (in days)
