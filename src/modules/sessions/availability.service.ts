@@ -115,7 +115,12 @@ export class AvailabilityService {
     const availability =
       await this.availabilityRepository.findActiveByCreator(creatorId);
 
+    this.logger.log(`getAvailableSlots: creatorId=${creatorId}, startDate=${startDate}, endDate=${endDate}, duration=${durationMinutes}`);
+    this.logger.log(`Settings: minimumNoticeHours=${settings.minimumNoticeHours}, bufferTime=${settings.bufferTime}`);
+    this.logger.log(`Availability slots found: ${availability.length}`);
+    
     if (availability.length === 0) {
+      this.logger.warn('No availability slots found for creator');
       return [];
     }
 
@@ -137,11 +142,15 @@ export class AvailabilityService {
       now.getTime() + settings.minimumNoticeHours * 60 * 60 * 1000,
     );
 
+    this.logger.log(`Current time: ${now.toISOString()}, Minimum notice time: ${minimumNotice.toISOString()}`);
+
     while (currentDate <= end) {
       const dayOfWeek = currentDate.getDay() as DayOfWeek;
       const dayAvailability = availability.filter(
         (a) => a.dayOfWeek === dayOfWeek,
       );
+
+      this.logger.debug(`Checking ${currentDate.toISOString().split('T')[0]}, dayOfWeek=${dayOfWeek}, matchingSlots=${dayAvailability.length}`);
 
       if (dayAvailability.length > 0) {
         const dateStr = currentDate.toISOString().split('T')[0];
