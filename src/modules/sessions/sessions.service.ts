@@ -135,27 +135,14 @@ export class SessionsService {
 
     // Generate video room URL when confirming
     if (dto.status === SessionStatus.CONFIRMED && !session.videoRoomUrl) {
-      const videoData = this.generateVideoRoom(session.videoProvider);
+      const videoData = this.generateVideoRoom(session.videoProvider as VideoProvider);
       updates.videoRoomUrl = videoData.url;
       updates.videoRoomId = videoData.roomId;
     }
 
-    // Track session start/end times
-    if (dto.status === SessionStatus.IN_PROGRESS && !session.startedAt) {
-      updates.startedAt = new Date();
-    }
-
-    if (dto.status === SessionStatus.COMPLETED && !session.endedAt) {
-      updates.endedAt = new Date();
-    }
-
     // Handle cancellation
     if (dto.status === SessionStatus.CANCELLED) {
-      updates.metadata = {
-        ...session.metadata,
-        cancellationReason: dto.cancellationReason,
-        cancelledBy: userId,
-      };
+      updates.cancellationReason = dto.cancellationReason;
     }
 
     // Add creator notes
@@ -203,7 +190,6 @@ export class SessionsService {
 
     const updatedSession = await this.sessionsRepository.update(sessionId, {
       status: SessionStatus.IN_PROGRESS,
-      startedAt: new Date(),
     });
 
     return this.mapToResponseDto(updatedSession!);
@@ -227,7 +213,6 @@ export class SessionsService {
 
     const updatedSession = await this.sessionsRepository.update(sessionId, {
       status: SessionStatus.COMPLETED,
-      endedAt: new Date(),
     });
 
     return this.mapToResponseDto(updatedSession!);
