@@ -215,7 +215,10 @@ export class CreatorsController {
     @Param('id') creatorId: string,
     @Query('visibility') visibility: 'public' | 'all' = 'public',
   ): Promise<AgentResponseDto[]> {
-    return this.agentsService.findByCreator(creatorId, visibility === 'all');
+    return this.agentsService.findByCreatorWithVisibility(
+      creatorId,
+      visibility,
+    );
   }
 
   @Get(':id/documents')
@@ -233,7 +236,10 @@ export class CreatorsController {
     @Param('id') creatorId: string,
     @Query('visibility') visibility: 'public' | 'all' = 'public',
   ): Promise<DocumentResponseDto[]> {
-    return this.documentsService.findByCreator(creatorId, visibility === 'all');
+    return this.documentsService.findByCreatorWithVisibility(
+      creatorId,
+      visibility,
+    );
   }
 
   @Get(':id/sessions/settings')
@@ -247,7 +253,7 @@ export class CreatorsController {
   async getCreatorSessionSettings(
     @Param('id') creatorId: string,
   ): Promise<SessionSettingsResponseDto> {
-    return this.availabilityService.getSettings(creatorId);
+    return this.availabilityService.getSessionSettings(creatorId);
   }
 
   @Get(':id')
