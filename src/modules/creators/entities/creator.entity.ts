@@ -9,25 +9,18 @@ import {
 } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 
-export enum CreatorStatus {
-  PENDING = 'pending',
-  VERIFIED = 'verified',
-  SUSPENDED = 'suspended',
-}
-
 export enum ExpertiseLevel {
   BEGINNER = 'beginner',
   INTERMEDIATE = 'intermediate',
   EXPERT = 'expert',
-  MASTER = 'master',
 }
 
-@Entity('creator')
+@Entity('creator_profile')
 export class Creator {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ name: 'user_id', type: 'uuid' })
+  @Column({ name: 'user_id', type: 'uuid', unique: true })
   userId: string;
 
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
@@ -40,7 +33,7 @@ export class Creator {
   @Column({ type: 'text', nullable: true })
   bio: string;
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ type: 'varchar', length: 200, nullable: true })
   tagline: string;
 
   @Column({ type: 'varchar', array: true, default: [] })
@@ -76,32 +69,9 @@ export class Creator {
   })
   minimumBooking: number;
 
-  // Social Links
-  @Column({ name: 'website_url', type: 'varchar', nullable: true })
-  websiteUrl: string;
-
-  @Column({ name: 'linkedin_url', type: 'varchar', nullable: true })
-  linkedinUrl: string;
-
-  @Column({ name: 'twitter_url', type: 'varchar', nullable: true })
-  twitterUrl: string;
-
-  @Column({ name: 'github_url', type: 'varchar', nullable: true })
-  githubUrl: string;
-
-  // Verification & Status
-  @Column({
-    type: 'enum',
-    enum: CreatorStatus,
-    default: CreatorStatus.PENDING,
-  })
-  status: CreatorStatus;
-
+  // Availability
   @Column({ name: 'is_available', type: 'boolean', default: false })
   isAvailable: boolean;
-
-  @Column({ name: 'verification_notes', type: 'text', nullable: true })
-  verificationNotes: string;
 
   // Statistics
   @Column({ name: 'total_agents', type: 'int', default: 0 })

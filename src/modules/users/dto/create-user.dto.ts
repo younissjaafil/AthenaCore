@@ -1,4 +1,4 @@
-import { IsEmail, IsEnum, IsOptional, IsString, IsUrl } from 'class-validator';
+import { IsEmail, IsOptional, IsString, IsUrl, IsArray } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { UserRole } from '../../../common/constants/roles.enum';
 
@@ -31,8 +31,11 @@ export class CreateUserDto {
   @IsUrl()
   profileImageUrl?: string;
 
-  @ApiPropertyOptional({ enum: UserRole, default: UserRole.STUDENT })
+  @ApiPropertyOptional({
+    example: ['user'],
+    description: 'User roles array - user, creator, admin',
+  })
   @IsOptional()
-  @IsEnum(UserRole)
-  role?: UserRole;
+  @IsArray()
+  roles?: UserRole[];
 }

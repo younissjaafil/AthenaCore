@@ -1,15 +1,15 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsOptional, IsEnum } from 'class-validator';
-import { UserRole } from '../../../common/constants/roles.enum';
+import { IsOptional, IsArray, IsIn } from 'class-validator';
+import { UserRole, VALID_ROLES } from '../../../common/constants/roles.enum';
 
 export class UpdateUserRoleDto {
   @ApiProperty({
     description: 'User roles to assign',
-    enum: UserRole,
-    isArray: true,
-    example: [UserRole.STUDENT, UserRole.CREATOR],
+    type: [String],
+    example: ['user', 'creator'],
   })
-  @IsEnum(UserRole, { each: true })
+  @IsArray()
+  @IsIn(VALID_ROLES, { each: true })
   roles: UserRole[];
 }
 

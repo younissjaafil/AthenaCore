@@ -22,7 +22,6 @@ import { ClerkAuthGuard } from '../auth/guards/clerk-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { UserRole } from '../../common/constants/roles.enum';
 import {
   SystemStatsDto,
   UserStatsDto,
@@ -66,7 +65,7 @@ export class AdminController {
 
   @Get('stats/system')
   @UseGuards(ClerkAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles('admin')
   @ApiOperation({ summary: 'Get comprehensive system statistics' })
   @ApiResponse({
     status: 200,

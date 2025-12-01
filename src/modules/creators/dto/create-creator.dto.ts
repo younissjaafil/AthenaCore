@@ -5,8 +5,6 @@ import {
   IsEnum,
   IsNumber,
   IsBoolean,
-  IsUrl,
-  IsEmail,
   Min,
   MaxLength,
 } from 'class-validator';
@@ -65,41 +63,8 @@ export class CreateCreatorDto {
   @Min(0)
   minimumBooking?: number;
 
-  @ApiPropertyOptional({ description: 'Website URL' })
-  @IsOptional()
-  @IsUrl()
-  websiteUrl?: string;
-
-  @ApiPropertyOptional({ description: 'LinkedIn profile URL' })
-  @IsOptional()
-  @IsUrl()
-  linkedinUrl?: string;
-
-  @ApiPropertyOptional({ description: 'Twitter profile URL' })
-  @IsOptional()
-  @IsUrl()
-  twitterUrl?: string;
-
-  @ApiPropertyOptional({ description: 'GitHub profile URL' })
-  @IsOptional()
-  @IsUrl()
-  githubUrl?: string;
-
   @ApiPropertyOptional({ description: 'Availability status' })
   @IsOptional()
   @IsBoolean()
   isAvailable?: boolean;
-
-  @ApiPropertyOptional({ description: 'Payout email address' })
-  @IsOptional()
-  @IsEmail()
-  payoutEmail?: string;
-
-  @ApiPropertyOptional({
-    description: 'Payout method',
-    example: 'stripe',
-  })
-  @IsOptional()
-  @IsString()
-  payoutMethod?: string;
 }

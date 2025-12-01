@@ -1,7 +1,6 @@
 import {
   Controller,
   Get,
-  Post,
   Body,
   Patch,
   Param,
@@ -17,16 +16,12 @@ import {
   ApiResponse,
 } from '@nestjs/swagger';
 import { UsersService } from './users.service';
-import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserResponseDto } from './dto/user-response.dto';
-import { SetIntentDto } from './dto/set-intent.dto';
 import { ClerkAuthGuard } from '../auth/guards/clerk-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { UserRole } from '../../common/constants/roles.enum';
-import { User } from './entities/user.entity';
 
 @ApiTags('Users')
 @Controller('users')
@@ -78,7 +73,7 @@ export class UsersController {
 
   @Get()
   @UseGuards(ClerkAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles('admin')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all users (Admin only)' })
   @ApiResponse({
@@ -124,52 +119,9 @@ export class UsersController {
     return this.usersService.toResponseDto(user);
   }
 
-  @Post('me/intent')
-  @UseGuards(ClerkAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Set user intent (learn vs earn)' })
-  @ApiResponse({
-    status: 200,
-    description: 'Intent set successfully',
-    type: UserResponseDto,
-  })
-  async setIntent(
-    @CurrentUser() clerkUser: any,
-    @Body() setIntentDto: SetIntentDto,
-  ): Promise<UserResponseDto> {
-    const user = await this.usersService.findByClerkIdOrThrow(
-      clerkUser.sub || clerkUser.clerkId,
-    );
-    const updated = await this.usersService.setUserIntent(
-      user.id,
-      setIntentDto.intent,
-    );
-    return this.usersService.toResponseDto(updated);
-  }
-
-  @Post('me/complete-discovery')
-  @UseGuards(ClerkAuthGuard)
-  @ApiBearerAuth()
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Mark discovery phase as completed' })
-  @ApiResponse({
-    status: 200,
-    description: 'Discovery completed',
-    type: UserResponseDto,
-  })
-  async completeDiscovery(
-    @CurrentUser() clerkUser: any,
-  ): Promise<UserResponseDto> {
-    const user = await this.usersService.findByClerkIdOrThrow(
-      clerkUser.sub || clerkUser.clerkId,
-    );
-    const updated = await this.usersService.completeDiscovery(user.id);
-    return this.usersService.toResponseDto(updated);
-  }
-
   @Delete(':id')
   @UseGuards(ClerkAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles('admin')
   @ApiBearerAuth()
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete user (Admin only)' })

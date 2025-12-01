@@ -93,6 +93,16 @@ export class CreatorsController {
     return this.followService.getCreatorStats(creator.id);
   }
 
+  @Delete('me/power')
+  @UseGuards(ClerkAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Disable creator power (remove creator role)' })
+  @ApiResponse({ status: 204, description: 'Creator power disabled' })
+  async disableCreatorPower(@CurrentUser() user: User): Promise<void> {
+    await this.creatorsService.disableCreatorPower(user.id);
+  }
+
   @Post()
   @UseGuards(ClerkAuthGuard)
   @ApiBearerAuth()
@@ -271,7 +281,7 @@ export class CreatorsController {
 
   @Patch(':id')
   @UseGuards(ClerkAuthGuard, RolesGuard)
-  @Roles(UserRole.CREATOR, UserRole.ADMIN)
+  @Roles('creator', 'admin')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update creator profile' })
   @ApiResponse({
@@ -289,7 +299,7 @@ export class CreatorsController {
 
   @Delete(':id')
   @UseGuards(ClerkAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles('admin')
   @ApiBearerAuth()
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete creator (Admin only)' })

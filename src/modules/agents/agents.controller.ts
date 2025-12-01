@@ -37,7 +37,7 @@ export class AgentsController {
 
   @Post()
   @UseGuards(ClerkAuthGuard, RolesGuard)
-  @Roles(UserRole.CREATOR)
+  @Roles('creator')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new agent (Creator only)' })
   @ApiResponse({
@@ -82,7 +82,7 @@ export class AgentsController {
 
   @Get('my-agents')
   @UseGuards(ClerkAuthGuard, RolesGuard)
-  @Roles(UserRole.CREATOR)
+  @Roles('creator')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get my agents (Creator only)' })
   @ApiResponse({
@@ -137,7 +137,7 @@ export class AgentsController {
 
   @Patch(':id')
   @UseGuards(ClerkAuthGuard, RolesGuard)
-  @Roles(UserRole.CREATOR)
+  @Roles('creator')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update agent (Creator only - own agents)' })
   @ApiResponse({
@@ -160,7 +160,7 @@ export class AgentsController {
 
   @Delete(':id')
   @UseGuards(ClerkAuthGuard, RolesGuard)
-  @Roles(UserRole.CREATOR, UserRole.ADMIN)
+  @Roles('creator', 'admin')
   @ApiBearerAuth()
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete agent (Creator/Admin)' })

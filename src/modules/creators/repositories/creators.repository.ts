@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Creator, CreatorStatus } from '../entities/creator.entity';
+import { Creator } from '../entities/creator.entity';
 
 @Injectable()
 export class CreatorsRepository {
@@ -36,17 +36,9 @@ export class CreatorsRepository {
     });
   }
 
-  async findVerified(): Promise<Creator[]> {
-    return this.creatorRepository.find({
-      where: { status: CreatorStatus.VERIFIED },
-      relations: ['user'],
-      order: { averageRating: 'DESC' },
-    });
-  }
-
   async findAvailable(): Promise<Creator[]> {
     return this.creatorRepository.find({
-      where: { status: CreatorStatus.VERIFIED, isAvailable: true },
+      where: { isAvailable: true },
       relations: ['user'],
       order: { averageRating: 'DESC' },
     });
@@ -89,9 +81,5 @@ export class CreatorsRepository {
       averageRating: Math.round(averageRating * 100) / 100,
       totalReviews,
     });
-  }
-
-  async addEarnings(id: string, amount: number): Promise<void> {
-    await this.creatorRepository.increment({ id }, 'totalEarnings', amount);
   }
 }

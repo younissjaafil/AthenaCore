@@ -23,41 +23,20 @@ export class UserResponseDto {
   @ApiPropertyOptional({ example: 'https://img.clerk.com/abc123' })
   profileImageUrl?: string;
 
-  @ApiProperty({ enum: UserRole, example: UserRole.STUDENT })
-  role: UserRole;
+  @ApiProperty({
+    example: ['user'],
+    description: 'User roles array',
+  })
+  roles: UserRole[];
 
-  @ApiProperty({ example: false })
+  @ApiProperty({ example: false, description: 'Computed from roles array' })
+  isCreator: boolean;
+
+  @ApiProperty({ example: false, description: 'Computed from roles array' })
   isAdmin: boolean;
 
   @ApiProperty({ example: false })
   hasCompletedOnboarding: boolean;
-
-  @ApiProperty({
-    example: false,
-    description: 'User wants to learn from creators',
-  })
-  isLearner: boolean;
-
-  @ApiProperty({
-    example: false,
-    description: 'User intends to become a creator',
-  })
-  isCreatorIntent: boolean;
-
-  @ApiProperty({
-    example: false,
-    description: 'User has completed initial discovery/explore phase',
-  })
-  hasCompletedDiscovery: boolean;
-
-  @ApiPropertyOptional({ description: 'When user selected their intent' })
-  intentSelectedAt?: Date;
-
-  @ApiPropertyOptional({
-    example: 'creator-dashboard',
-    description: 'Last activity context for smart redirects',
-  })
-  lastActivityContext?: string;
 
   @ApiProperty({ example: true })
   isActive: boolean;

@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../users/entities/user.entity';
-import { Creator, CreatorStatus } from '../creators/entities/creator.entity';
+import { Creator } from '../creators/entities/creator.entity';
 import { Agent } from '../agents/entities/agent.entity';
 import { Document } from '../documents/entities/document.entity';
 import { Conversation } from '../conversations/entities/conversation.entity';
@@ -180,7 +180,7 @@ export class AdminService {
       totalRevenue,
       averageRating: 0, // Placeholder for rating system
       documentCount,
-      isVerified: creator.status === CreatorStatus.VERIFIED,
+      isVerified: creator.isAvailable, // Use availability as verification proxy for now
     };
   }
 
@@ -250,13 +250,13 @@ export class AdminService {
       throw new NotFoundException('User not found');
     }
 
-    // Update user role - only support single role for now
-    user.role = roles[0];
+    // Update user roles array
+    user.roles = roles;
     await this.userRepository.save(user);
 
     return {
       success: true,
-      message: `User role updated to: ${roles.join(', ')}`,
+      message: `User roles updated to: ${roles.join(', ')}`,
     };
   }
 
@@ -273,11 +273,8 @@ export class AdminService {
     }
 
     user.isActive = false;
-    user.metadata = {
-      ...user.metadata,
-      deactivatedAt: new Date().toISOString(),
-      deactivationReason: reason,
-    };
+    // Note: deactivation reason stored in audit log or separate table
+    // TODO: Add deactivation tracking in v2 schema
 
     await this.userRepository.save(user);
 

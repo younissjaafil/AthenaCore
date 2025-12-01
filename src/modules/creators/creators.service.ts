@@ -5,9 +5,8 @@ import { CreatorsRepository } from './repositories/creators.repository';
 import { CreateCreatorDto } from './dto/create-creator.dto';
 import { UpdateCreatorDto } from './dto/update-creator.dto';
 import { CreatorResponseDto } from './dto/creator-response.dto';
-import { Creator, CreatorStatus } from './entities/creator.entity';
+import { Creator } from './entities/creator.entity';
 import { UsersService } from '../users/users.service';
-import { UserRole } from '../../common/constants/roles.enum';
 import { UserProfile } from '../profiles/entities/user-profile.entity';
 
 @Injectable()
@@ -19,6 +18,10 @@ export class CreatorsService {
     private readonly profileRepo: Repository<UserProfile>,
   ) {}
 
+  /**
+   * Enable creator power for a user
+   * Creates creator_profile and adds 'creator' role to user
+   */
   async create(
     userId: string,
     createCreatorDto: CreateCreatorDto,
@@ -32,24 +35,27 @@ export class CreatorsService {
     // Check if creator profile already exists
     const existing = await this.creatorsRepository.findByUserId(userId);
     if (existing) {
-      // Return existing creator instead of throwing error
       return this.toResponseDto(existing);
     }
 
-    // Create creator profile with verified status for v1 (auto-approved)
+    // Create creator profile (auto-approved)
     const creator = await this.creatorsRepository.create({
       userId,
       ...createCreatorDto,
-      status: CreatorStatus.VERIFIED, // Set to verified for v1, no approval needed
     });
 
-    // Assign CREATOR role and mark onboarding as complete
-    await this.usersService.update(userId, {
-      role: UserRole.CREATOR,
-      hasCompletedOnboarding: true,
-    });
+    // Add 'creator' role to user
+    await this.usersService.enableCreatorPower(userId);
 
     return this.toResponseDto(creator);
+  }
+
+  /**
+   * Disable creator power for a user
+   * Removes 'creator' role but keeps creator_profile for data retention
+   */
+  async disableCreatorPower(userId: string): Promise<void> {
+    await this.usersService.disableCreatorPower(userId);
   }
 
   async findAll(): Promise<CreatorResponseDto[]> {
@@ -58,8 +64,8 @@ export class CreatorsService {
   }
 
   async findVerified(): Promise<CreatorResponseDto[]> {
-    const creators = await this.creatorsRepository.findVerified();
-    return this.enrichCreatorsWithProfiles(creators);
+    // All creators are auto-verified now, so just return all
+    return this.findAll();
   }
 
   async findAvailable(): Promise<CreatorResponseDto[]> {
@@ -98,10 +104,16 @@ export class CreatorsService {
   }
 
   async remove(id: string): Promise<void> {
-    const deleted = await this.creatorsRepository.delete(id);
-    if (!deleted) {
+    const creator = await this.creatorsRepository.findById(id);
+    if (!creator) {
       throw new NotFoundException(`Creator with ID ${id} not found`);
     }
+
+    // Remove creator role from user
+    await this.usersService.disableCreatorPower(creator.userId);
+
+    // Delete creator profile
+    await this.creatorsRepository.delete(id);
   }
 
   toResponseDto(creator: Creator, profile?: UserProfile): CreatorResponseDto {
@@ -116,11 +128,6 @@ export class CreatorsService {
       expertiseLevel: creator.expertiseLevel,
       hourlyRate: Number(creator.hourlyRate),
       minimumBooking: Number(creator.minimumBooking),
-      websiteUrl: creator.websiteUrl,
-      linkedinUrl: creator.linkedinUrl,
-      twitterUrl: creator.twitterUrl,
-      githubUrl: creator.githubUrl,
-      status: creator.status,
       isAvailable: creator.isAvailable,
       totalAgents: creator.totalAgents,
       totalSessions: creator.totalSessions,

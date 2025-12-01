@@ -167,14 +167,10 @@ export class UsersService {
       lastName: user.lastName,
       fullName: user.fullName,
       profileImageUrl: user.profileImageUrl,
-      role: user.role,
+      roles: user.roles,
+      isCreator: user.isCreator,
       isAdmin: user.isAdmin,
       hasCompletedOnboarding: user.hasCompletedOnboarding,
-      isLearner: user.isLearner,
-      isCreatorIntent: user.isCreatorIntent,
-      hasCompletedDiscovery: user.hasCompletedDiscovery,
-      intentSelectedAt: user.intentSelectedAt,
-      lastActivityContext: user.lastActivityContext,
       isActive: user.isActive,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
@@ -182,50 +178,68 @@ export class UsersService {
   }
 
   /**
-   * Set user's initial intent (Learn vs Earn)
+   * Add creator role to user (enable creator power)
    */
-  async setUserIntent(userId: string, intent: 'learn' | 'earn'): Promise<User> {
+  async enableCreatorPower(userId: string): Promise<User> {
     const user = await this.findOne(userId);
 
-    const updateData: Partial<User> = {
-      intentSelectedAt: new Date(),
-    };
-
-    if (intent === 'learn') {
-      updateData.isLearner = true;
-      updateData.isCreatorIntent = false;
-    } else {
-      updateData.isLearner = false;
-      updateData.isCreatorIntent = true;
+    if (user.isCreator) {
+      return user; // Already a creator
     }
 
-    const updated = await this.usersRepository.update(userId, updateData);
-    if (!updated) {
-      throw new NotFoundException(`User with ID ${userId} not found`);
-    }
-
-    return updated;
-  }
-
-  /**
-   * Mark discovery phase as completed
-   */
-  async completeDiscovery(userId: string): Promise<User> {
+    const newRoles = [...user.roles, 'creator'] as any;
     const updated = await this.usersRepository.update(userId, {
-      hasCompletedDiscovery: true,
+      roles: newRoles,
     });
+
     if (!updated) {
       throw new NotFoundException(`User with ID ${userId} not found`);
     }
+
     return updated;
   }
 
   /**
-   * Update last activity context for smart redirects
+   * Remove creator role from user (disable creator power)
    */
-  async updateActivityContext(userId: string, context: string): Promise<void> {
-    await this.usersRepository.update(userId, {
-      lastActivityContext: context,
+  async disableCreatorPower(userId: string): Promise<User> {
+    const user = await this.findOne(userId);
+
+    if (!user.isCreator) {
+      return user; // Not a creator
+    }
+
+    const newRoles = user.roles.filter((r) => r !== 'creator') as any;
+    const updated = await this.usersRepository.update(userId, {
+      roles: newRoles,
     });
+
+    if (!updated) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+
+    return updated;
+  }
+
+  /**
+   * Add admin role to user
+   */
+  async makeAdmin(userId: string): Promise<User> {
+    const user = await this.findOne(userId);
+
+    if (user.isAdmin) {
+      return user;
+    }
+
+    const newRoles = [...user.roles, 'admin'] as any;
+    const updated = await this.usersRepository.update(userId, {
+      roles: newRoles,
+    });
+
+    if (!updated) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+
+    return updated;
   }
 }

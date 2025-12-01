@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { CreatorStatus, ExpertiseLevel } from '../entities/creator.entity';
+import { ExpertiseLevel } from '../entities/creator.entity';
 
 export class CreatorResponseDto {
   @ApiProperty()
@@ -31,21 +31,6 @@ export class CreatorResponseDto {
 
   @ApiProperty()
   minimumBooking: number;
-
-  @ApiPropertyOptional()
-  websiteUrl?: string;
-
-  @ApiPropertyOptional()
-  linkedinUrl?: string;
-
-  @ApiPropertyOptional()
-  twitterUrl?: string;
-
-  @ApiPropertyOptional()
-  githubUrl?: string;
-
-  @ApiProperty({ enum: CreatorStatus })
-  status: CreatorStatus;
 
   @ApiProperty()
   isAvailable: boolean;
