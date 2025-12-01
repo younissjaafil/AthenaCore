@@ -35,7 +35,7 @@ export class Notification {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'uuid' })
+  @Column({ name: 'user_id', type: 'uuid' })
   userId: string;
 
   @Column({
@@ -70,7 +70,7 @@ export class Notification {
   @Column({ type: 'varchar', length: 100, nullable: true })
   template: string;
 
-  @Column({ type: 'jsonb', nullable: true })
+  @Column({ name: 'template_data', type: 'jsonb', nullable: true })
   templateData: Record<string, any>;
 
   @Column({ type: 'jsonb', nullable: true })
@@ -81,12 +81,12 @@ export class Notification {
     deliveredAt?: string;
   };
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ name: 'sent_at', type: 'timestamp', nullable: true })
   sentAt: Date;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 }

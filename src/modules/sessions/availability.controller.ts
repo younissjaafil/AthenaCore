@@ -165,36 +165,4 @@ export class AvailabilityController {
       await this.availabilityService.getCreatorIdFromUserId(userId);
     return this.availabilityService.updateSessionSettings(creatorId, dto);
   }
-
-  // Date Overrides
-  @Get('overrides')
-  @UseGuards(ClerkAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get my date overrides' })
-  async getMyDateOverrides(@CurrentUser('sub') userId: string) {
-    const creatorId =
-      await this.availabilityService.getCreatorIdFromUserId(userId);
-    return this.availabilityService.getDateOverrides(creatorId);
-  }
-
-  @Post('overrides')
-  @UseGuards(ClerkAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Set date overrides (replaces existing)' })
-  async setDateOverrides(
-    @CurrentUser('sub') userId: string,
-    @Body()
-    dto: {
-      overrides: {
-        date: string;
-        startTime?: string;
-        endTime?: string;
-        isAvailable: boolean;
-      }[];
-    },
-  ) {
-    const creatorId =
-      await this.availabilityService.getCreatorIdFromUserId(userId);
-    return this.availabilityService.setDateOverrides(creatorId, dto.overrides);
-  }
 }

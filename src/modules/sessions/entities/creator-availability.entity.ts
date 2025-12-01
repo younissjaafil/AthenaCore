@@ -26,25 +26,26 @@ export class CreatorAvailability {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'uuid' })
+  @Column({ name: 'creator_id', type: 'uuid' })
   creatorId: string;
 
   @ManyToOne(() => Creator, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'creatorId' })
+  @JoinColumn({ name: 'creator_id' })
   creator: Creator;
 
   @Column({
+    name: 'day_of_week',
     type: 'smallint',
   })
   dayOfWeek: DayOfWeek;
 
-  @Column({ type: 'time' })
+  @Column({ name: 'start_time', type: 'time' })
   startTime: string; // HH:MM format
 
-  @Column({ type: 'time' })
+  @Column({ name: 'end_time', type: 'time' })
   endTime: string; // HH:MM format
 
-  @Column({ type: 'boolean', default: true })
+  @Column({ name: 'is_active', type: 'boolean', default: true })
   isActive: boolean;
 
   @CreateDateColumn()

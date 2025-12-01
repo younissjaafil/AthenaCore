@@ -17,9 +17,6 @@ export class UserResponseDto {
   @ApiPropertyOptional({ example: 'Doe' })
   lastName?: string;
 
-  @ApiPropertyOptional({ example: 'John Doe' })
-  fullName?: string;
-
   @ApiPropertyOptional({ example: 'https://img.clerk.com/abc123' })
   profileImageUrl?: string;
 

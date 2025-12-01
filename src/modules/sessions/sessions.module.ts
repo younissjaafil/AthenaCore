@@ -6,7 +6,6 @@ import { SessionsRepository } from './repositories/sessions.repository';
 import { Session } from './entities/session.entity';
 import { CreatorAvailability } from './entities/creator-availability.entity';
 import { SessionSettings } from './entities/session-settings.entity';
-import { DateOverride } from './entities/date-override.entity';
 import { User } from '../users/entities/user.entity';
 import { Creator } from '../creators/entities/creator.entity';
 import { UsersModule } from '../users/users.module';
@@ -21,7 +20,6 @@ import { AvailabilityRepository } from './repositories/availability.repository';
       Session,
       CreatorAvailability,
       SessionSettings,
-      DateOverride,
       User,
       Creator,
     ]),

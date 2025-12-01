@@ -120,7 +120,6 @@ export class UsersService {
       firstName: clerkUserData.firstName,
       lastName: clerkUserData.lastName,
       profileImageUrl: clerkUserData.profileImageUrl,
-      isAdmin: false,
     });
   }
 
@@ -164,7 +163,6 @@ export class UsersService {
       username: user.username,
       firstName: user.firstName,
       lastName: user.lastName,
-      fullName: user.fullName,
       profileImageUrl: user.profileImageUrl,
       roles: user.roles,
       isCreator: user.isCreator,
@@ -185,7 +183,6 @@ export class UsersService {
       username: user.username,
       firstName: user.firstName,
       lastName: user.lastName,
-      fullName: user.fullName,
       profileImageUrl: user.profileImageUrl,
       roles: user.roles,
       isCreator: user.isCreator,

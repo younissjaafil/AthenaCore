@@ -14,43 +14,48 @@ export class SessionSettings {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'uuid', unique: true })
+  @Column({ name: 'creator_id', type: 'uuid', unique: true })
   creatorId: string;
 
   @OneToOne(() => Creator, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'creatorId' })
+  @JoinColumn({ name: 'creator_id' })
   creator: Creator;
 
   // Session durations offered (in minutes)
-  @Column({ type: 'int', array: true, default: [30, 60] })
+  @Column({
+    name: 'session_durations',
+    type: 'int',
+    array: true,
+    default: [30, 60],
+  })
   sessionDurations: number[];
 
   // Default duration
-  @Column({ type: 'int', default: 60 })
+  @Column({ name: 'default_duration', type: 'int', default: 60 })
   defaultDuration: number;
 
   // Buffer time between sessions (in minutes)
-  @Column({ type: 'int', default: 15 })
+  @Column({ name: 'buffer_time', type: 'int', default: 15 })
   bufferTime: number;
 
   // Minimum notice for booking (in hours)
-  @Column({ type: 'int', default: 1 })
+  @Column({ name: 'minimum_notice_hours', type: 'int', default: 1 })
   minimumNoticeHours: number;
 
   // Maximum advance booking (in days)
-  @Column({ type: 'int', default: 30 })
+  @Column({ name: 'max_advance_booking_days', type: 'int', default: 30 })
   maxAdvanceBookingDays: number;
 
   // Auto-confirm sessions
-  @Column({ type: 'boolean', default: false })
+  @Column({ name: 'auto_confirm', type: 'boolean', default: false })
   autoConfirm: boolean;
 
   // Allow free sessions
-  @Column({ type: 'boolean', default: false })
+  @Column({ name: 'allow_free_session', type: 'boolean', default: false })
   allowFreeSession: boolean;
 
   // Price per session duration (JSON: { "30": 25, "60": 45 })
-  @Column({ type: 'jsonb', nullable: true })
+  @Column({ name: 'price_per_duration', type: 'jsonb', nullable: true })
   pricePerDuration: Record<string, number>;
 
   // Timezone
@@ -58,16 +63,16 @@ export class SessionSettings {
   timezone: string;
 
   // Session welcome message
-  @Column({ type: 'text', nullable: true })
+  @Column({ name: 'welcome_message', type: 'text', nullable: true })
   welcomeMessage: string;
 
   // Cancellation policy text
-  @Column({ type: 'text', nullable: true })
+  @Column({ name: 'cancellation_policy', type: 'text', nullable: true })
   cancellationPolicy: string;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 }

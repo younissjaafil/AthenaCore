@@ -44,39 +44,6 @@ export class UserProfile {
   @Column({ name: 'banner_url', type: 'varchar', length: 500, nullable: true })
   bannerUrl?: string;
 
-  @Column({ name: 'rank_score', type: 'int', default: 0 })
-  @Index()
-  rankScore: number;
-
-  // Social Links
-  @Column({ name: 'website_url', type: 'varchar', length: 500, nullable: true })
-  websiteUrl?: string;
-
-  @Column({ name: 'twitter_url', type: 'varchar', length: 500, nullable: true })
-  twitterUrl?: string;
-
-  @Column({
-    name: 'linkedin_url',
-    type: 'varchar',
-    length: 500,
-    nullable: true,
-  })
-  linkedinUrl?: string;
-
-  @Column({ name: 'github_url', type: 'varchar', length: 500, nullable: true })
-  githubUrl?: string;
-
-  @Column({
-    name: 'instagram_url',
-    type: 'varchar',
-    length: 500,
-    nullable: true,
-  })
-  instagramUrl?: string;
-
-  @Column({ name: 'youtube_url', type: 'varchar', length: 500, nullable: true })
-  youtubeUrl?: string;
-
   @Column({ name: 'is_verified', type: 'boolean', default: false })
   isVerified: boolean;
 

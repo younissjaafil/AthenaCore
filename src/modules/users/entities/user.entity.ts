@@ -52,13 +52,6 @@ export class User {
   updatedAt: Date;
 
   // Virtual properties
-  get fullName(): string {
-    if (this.firstName && this.lastName) {
-      return `${this.firstName} ${this.lastName}`;
-    }
-    return this.firstName || this.lastName || this.email;
-  }
-
   get isCreator(): boolean {
     return isCreator(this.roles);
   }

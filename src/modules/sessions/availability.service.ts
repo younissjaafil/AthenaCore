@@ -116,12 +116,6 @@ export class AvailabilityService {
       await this.availabilityRepository.getOrCreateSettings(creatorId);
     const availability =
       await this.availabilityRepository.findActiveByCreator(creatorId);
-    const dateOverrides =
-      await this.availabilityRepository.findDateOverridesInRange(
-        creatorId,
-        startDate,
-        endDate,
-      );
 
     this.logger.log(
       `getAvailableSlots: creatorId=${creatorId}, startDate=${startDate}, endDate=${endDate}, duration=${durationMinutes}`,
@@ -129,49 +123,7 @@ export class AvailabilityService {
     this.logger.log(
       `Settings: minimumNoticeHours=${settings.minimumNoticeHours}, bufferTime=${settings.bufferTime}, timezone=${settings.timezone}`,
     );
-    this.logger.log(
-      `Weekly availability slots: ${availability.length}, Date overrides: ${dateOverrides.length}`,
-    );
-
-    // Create a map of date overrides for quick lookup
-    const overrideMap = new Map<
-      string,
-      { isAvailable: boolean; slots: { start: string; end: string }[] }
-    >();
-    for (const override of dateOverrides) {
-      // Handle both Date objects and strings from database
-      // Use local date parts to avoid timezone shifting
-      const rawDate = override.date as unknown;
-      let dateKey: string;
-      if (rawDate instanceof Date) {
-        const year = rawDate.getFullYear();
-        const month = String(rawDate.getMonth() + 1).padStart(2, '0');
-        const day = String(rawDate.getDate()).padStart(2, '0');
-        dateKey = `${year}-${month}-${day}`;
-      } else {
-        dateKey = String(override.date).split('T')[0];
-      }
-
-      this.logger.log(
-        `Processing override: date=${override.date}, dateKey=${dateKey}, isAvailable=${override.isAvailable}, start=${override.startTime}, end=${override.endTime}`,
-      );
-
-      if (!overrideMap.has(dateKey)) {
-        overrideMap.set(dateKey, { isAvailable: true, slots: [] });
-      }
-      const entry = overrideMap.get(dateKey)!;
-
-      if (!override.isAvailable) {
-        // If any override blocks the day, mark as unavailable
-        entry.isAvailable = false;
-      } else if (override.startTime && override.endTime) {
-        entry.slots.push({ start: override.startTime, end: override.endTime });
-      }
-    }
-
-    this.logger.log(
-      `Override map keys: ${Array.from(overrideMap.keys()).join(', ')}`,
-    );
+    this.logger.log(`Weekly availability slots: ${availability.length}`);
 
     // Get existing sessions in the date range
     const start = new Date(startDate);
@@ -202,33 +154,15 @@ export class AvailabilityService {
       const day = String(currentDate.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
       const dayOfWeek = currentDate.getDay() as DayOfWeek;
-      const override = overrideMap.get(dateStr);
 
-      // Check if this date has an override
-      let dayAvailabilityRanges: { start: string; end: string }[] = [];
-
-      if (override) {
-        if (!override.isAvailable) {
-          // Date is blocked, skip
-          this.logger.debug(`${dateStr} is blocked by override`);
-          currentDate.setDate(currentDate.getDate() + 1);
-          continue;
-        }
-        // Use override slots instead of weekly availability
-        dayAvailabilityRanges = override.slots;
-        this.logger.debug(
-          `${dateStr} has ${override.slots.length} override slots`,
-        );
-      } else {
-        // Use weekly availability
-        const dayAvailability = availability.filter(
-          (a) => a.dayOfWeek === dayOfWeek,
-        );
-        dayAvailabilityRanges = dayAvailability.map((a) => ({
-          start: a.startTime,
-          end: a.endTime,
-        }));
-      }
+      // Use weekly availability
+      const dayAvailability = availability.filter(
+        (a) => a.dayOfWeek === dayOfWeek,
+      );
+      const dayAvailabilityRanges = dayAvailability.map((a) => ({
+        start: a.startTime,
+        end: a.endTime,
+      }));
 
       this.logger.debug(
         `Checking ${dateStr}, dayOfWeek=${dayOfWeek}, ranges=${dayAvailabilityRanges.length}`,
@@ -254,8 +188,6 @@ export class AvailabilityService {
 
           for (const slot of timeSlots) {
             // Create slot date in creator's timezone
-            // The slot time (e.g., "02:00") is in the creator's local timezone
-            // We need to convert it to UTC for comparison
             const slotDate = this.createDateInTimezone(
               dateStr,
               slot,
@@ -424,36 +356,6 @@ export class AvailabilityService {
       welcomeMessage: settings.welcomeMessage ?? undefined,
       cancellationPolicy: settings.cancellationPolicy ?? undefined,
     };
-  }
-
-  /**
-   * Get date overrides for a creator
-   */
-  async getDateOverrides(creatorId: string) {
-    return this.availabilityRepository.findDateOverrides(creatorId);
-  }
-
-  /**
-   * Set date overrides (replaces existing)
-   */
-  async setDateOverrides(
-    creatorId: string,
-    overrides: {
-      date: string;
-      startTime?: string;
-      endTime?: string;
-      isAvailable: boolean;
-    }[],
-  ) {
-    const data = overrides.map((o) => ({
-      creatorId,
-      date: o.date,
-      startTime: o.isAvailable ? o.startTime : null,
-      endTime: o.isAvailable ? o.endTime : null,
-      isAvailable: o.isAvailable,
-    }));
-
-    return this.availabilityRepository.setDateOverrides(creatorId, data);
   }
 
   /**
