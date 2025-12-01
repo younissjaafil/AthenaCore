@@ -60,6 +60,10 @@ export class UsersService {
     return this.usersRepository.findByEmail(email);
   }
 
+  async findByUsername(username: string): Promise<User | null> {
+    return this.usersRepository.findByUsername(username);
+  }
+
   async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
     const user = await this.findOne(id);
 
@@ -81,8 +85,10 @@ export class UsersService {
   async findOrCreate(clerkUserData: {
     sub: string;
     email: string;
+    username?: string;
     firstName?: string;
     lastName?: string;
+    profileImageUrl?: string;
   }): Promise<User> {
     // Try to find existing user by clerkId
     const existingUser = await this.usersRepository.findByClerkId(
@@ -90,20 +96,30 @@ export class UsersService {
     );
 
     if (existingUser) {
+      // Update user with latest Clerk data if username changed
+      if (
+        clerkUserData.username &&
+        existingUser.username !== clerkUserData.username
+      ) {
+        await this.usersRepository.update(existingUser.id, {
+          username: clerkUserData.username,
+          firstName: clerkUserData.firstName,
+          lastName: clerkUserData.lastName,
+          profileImageUrl: clerkUserData.profileImageUrl,
+        });
+        return this.usersRepository.findById(existingUser.id) as Promise<User>;
+      }
       return existingUser;
     }
 
     // Create new user if not found
-    const name = [clerkUserData.firstName, clerkUserData.lastName]
-      .filter(Boolean)
-      .join(' ')
-      .trim();
-
     return this.usersRepository.create({
       clerkId: clerkUserData.sub,
       email: clerkUserData.email,
+      username: clerkUserData.username,
       firstName: clerkUserData.firstName,
       lastName: clerkUserData.lastName,
+      profileImageUrl: clerkUserData.profileImageUrl,
       isAdmin: false,
       hasCompletedOnboarding: false,
     });
@@ -118,6 +134,7 @@ export class UsersService {
       // Update existing user
       const updated = await this.usersRepository.update(existingUser.id, {
         email: clerkUserData.email_addresses[0]?.email_address,
+        username: clerkUserData.username,
         firstName: clerkUserData.first_name,
         lastName: clerkUserData.last_name,
         profileImageUrl: clerkUserData.image_url,
@@ -134,6 +151,7 @@ export class UsersService {
     return this.usersRepository.create({
       clerkId: clerkUserData.id,
       email: clerkUserData.email_addresses[0]?.email_address,
+      username: clerkUserData.username,
       firstName: clerkUserData.first_name,
       lastName: clerkUserData.last_name,
       profileImageUrl: clerkUserData.image_url,
@@ -144,6 +162,7 @@ export class UsersService {
     return {
       id: user.id,
       email: user.email,
+      username: user.username,
       firstName: user.firstName,
       lastName: user.lastName,
       fullName: user.fullName,

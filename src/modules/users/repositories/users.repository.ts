@@ -31,6 +31,10 @@ export class UsersRepository {
     return this.userRepository.findOne({ where: { email } });
   }
 
+  async findByUsername(username: string): Promise<User | null> {
+    return this.userRepository.findOne({ where: { username } });
+  }
+
   async update(id: string, userData: Partial<User>): Promise<User | null> {
     await this.userRepository.update(id, userData);
     return this.findById(id);

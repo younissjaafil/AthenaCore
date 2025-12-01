@@ -91,8 +91,10 @@ export class ClerkAuthGuard implements CanActivate {
           email:
             clerkUser.emailAddresses?.[0]?.emailAddress ||
             `${clerkId}@placeholder.com`,
+          username: clerkUser.username || undefined,
           firstName: clerkUser.firstName || undefined,
           lastName: clerkUser.lastName || undefined,
+          profileImageUrl: clerkUser.imageUrl || undefined,
         });
       }
 
