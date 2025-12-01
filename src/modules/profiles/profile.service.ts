@@ -106,7 +106,7 @@ export class ProfileService {
       const newProfile = this.profileRepo.create({
         userId: user.id,
         handle: user.username?.toLowerCase() || handle.toLowerCase(),
-        displayName: user.fullName || user.email,
+        displayName: user.firstName || user.email,
         avatarUrl: user.profileImageUrl,
       });
 
@@ -159,7 +159,7 @@ export class ProfileService {
         const newProfile = this.profileRepo.create({
           userId: user.id,
           handle,
-          displayName: user.fullName || user.email,
+          displayName: user.firstName || user.email,
           avatarUrl: user.profileImageUrl,
         });
 
@@ -218,7 +218,7 @@ export class ProfileService {
     const profile = this.profileRepo.create({
       userId,
       handle: dto.handle.toLowerCase(),
-      displayName: dto.displayName || user.fullName,
+      displayName: dto.displayName || user.firstName,
       bio: dto.bio,
       avatarUrl: user.profileImageUrl,
     });
@@ -255,12 +255,7 @@ export class ProfileService {
     if (dto.bio !== undefined) profile.bio = dto.bio;
     if (dto.avatarUrl !== undefined) profile.avatarUrl = dto.avatarUrl;
     if (dto.bannerUrl !== undefined) profile.bannerUrl = dto.bannerUrl;
-    if (dto.websiteUrl !== undefined) profile.websiteUrl = dto.websiteUrl;
-    if (dto.twitterUrl !== undefined) profile.twitterUrl = dto.twitterUrl;
-    if (dto.linkedinUrl !== undefined) profile.linkedinUrl = dto.linkedinUrl;
-    if (dto.githubUrl !== undefined) profile.githubUrl = dto.githubUrl;
-    if (dto.instagramUrl !== undefined) profile.instagramUrl = dto.instagramUrl;
-    if (dto.youtubeUrl !== undefined) profile.youtubeUrl = dto.youtubeUrl;
+    // Note: Social media URLs are stored in creator_profile table, not user_profile
 
     const saved = await this.profileRepo.save(profile);
     return this.enrichProfileResponse(saved, userId);
@@ -557,13 +552,13 @@ export class ProfileService {
       bio: profile.bio,
       avatarUrl: profile.avatarUrl,
       bannerUrl: profile.bannerUrl,
-      rankScore: profile.rankScore,
-      websiteUrl: profile.websiteUrl,
-      twitterUrl: profile.twitterUrl,
-      linkedinUrl: profile.linkedinUrl,
-      githubUrl: profile.githubUrl,
-      instagramUrl: profile.instagramUrl,
-      youtubeUrl: profile.youtubeUrl,
+      rankScore: 0, // Default value, actual rank comes from creator_profile
+      websiteUrl: undefined,
+      twitterUrl: undefined,
+      linkedinUrl: undefined,
+      githubUrl: undefined,
+      instagramUrl: undefined,
+      youtubeUrl: undefined,
       isVerified: profile.isVerified,
       followerCount: profile.followerCount,
       followingCount: profile.followingCount,
@@ -586,6 +581,15 @@ export class ProfileService {
     if (creator) {
       response.creatorId = creator.id;
       response.averageRating = Number(creator.averageRating) || 0;
+
+      // Populate social URLs from creator profile
+      response.rankScore = creator.rankScore || 0;
+      response.websiteUrl = creator.websiteUrl;
+      response.twitterUrl = creator.twitterUrl;
+      response.linkedinUrl = creator.linkedinUrl;
+      response.githubUrl = creator.githubUrl;
+      response.instagramUrl = creator.instagramUrl;
+      response.youtubeUrl = creator.youtubeUrl;
 
       // Get counts (could optimize with a single query)
       const [agentCount, sessionCount] = await Promise.all([

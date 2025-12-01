@@ -64,3 +64,5 @@ enable-pgvector.ts
 migrations
 
 PHASE1_ONBOARDING.md
+
+DATABASE_SCHEMA_RULES.md
