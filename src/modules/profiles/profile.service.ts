@@ -149,8 +149,12 @@ export class ProfileService {
       const user = await this.userRepo.findOne({ where: { id: userId } });
       if (user) {
         this.logger.debug(`Auto-creating profile for user: ${userId}`);
-        const handle = user.username?.toLowerCase() ||
-          user.email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
+        const handle =
+          user.username?.toLowerCase() ||
+          user.email
+            .split('@')[0]
+            .toLowerCase()
+            .replace(/[^a-z0-9]/g, '');
 
         const newProfile = this.profileRepo.create({
           userId: user.id,
@@ -171,7 +175,9 @@ export class ProfileService {
             profile = await this.profileRepo.save(newProfile);
             profile.user = user;
           } catch {
-            throw new NotFoundException('Profile not found and could not be created');
+            throw new NotFoundException(
+              'Profile not found and could not be created',
+            );
           }
         }
       } else {
