@@ -21,6 +21,7 @@ import { HttpModule } from './infrastructure/http/http.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { CreatorsModule } from './modules/creators/creators.module';
+import { ProfileModule } from './modules/profiles/profile.module';
 import { AgentsModule } from './modules/agents/agents.module';
 import { DocumentsModule } from './modules/documents/documents.module';
 import { RagModule } from './modules/rag/rag.module';
@@ -48,6 +49,7 @@ import { HealthModule } from './modules/health/health.module';
     AuthModule,
     UsersModule,
     CreatorsModule,
+    ProfileModule,
     AgentsModule,
     DocumentsModule,
     RagModule,
