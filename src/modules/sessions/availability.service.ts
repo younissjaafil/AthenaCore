@@ -140,11 +140,17 @@ export class AvailabilityService {
     >();
     for (const override of dateOverrides) {
       // Handle both Date objects and strings from database
+      // Use local date parts to avoid timezone shifting
       const rawDate = override.date as unknown;
-      const dateKey =
-        rawDate instanceof Date
-          ? rawDate.toISOString().split('T')[0]
-          : String(override.date).split('T')[0];
+      let dateKey: string;
+      if (rawDate instanceof Date) {
+        const year = rawDate.getFullYear();
+        const month = String(rawDate.getMonth() + 1).padStart(2, '0');
+        const day = String(rawDate.getDate()).padStart(2, '0');
+        dateKey = `${year}-${month}-${day}`;
+      } else {
+        dateKey = String(override.date).split('T')[0];
+      }
 
       this.logger.log(
         `Processing override: date=${override.date}, dateKey=${dateKey}, isAvailable=${override.isAvailable}, start=${override.startTime}, end=${override.endTime}`,
@@ -190,7 +196,11 @@ export class AvailabilityService {
     );
 
     while (currentDate <= end) {
-      const dateStr = currentDate.toISOString().split('T')[0];
+      // Use local date parts to avoid timezone shifting
+      const year = currentDate.getFullYear();
+      const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+      const day = String(currentDate.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
       const dayOfWeek = currentDate.getDay() as DayOfWeek;
       const override = overrideMap.get(dateStr);
 
@@ -447,66 +457,27 @@ export class AvailabilityService {
   }
 
   /**
-   * Create a Date object interpreting a date/time string in a specific timezone
+   * Create a Date object from a date/time string
+   * For V1, we treat times as-is without timezone conversion (Lebanon focused)
    * @param dateStr Date string in YYYY-MM-DD format
    * @param timeStr Time string in HH:MM format
-   * @param timezone IANA timezone string (e.g., 'Asia/Beirut', 'UTC')
-   * @returns Date object in UTC
+   * @param timezone IANA timezone string (ignored for V1 - kept for future use)
+   * @returns Date object
    */
   private createDateInTimezone(
     dateStr: string,
     timeStr: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     timezone: string,
   ): Date {
-    // Get timezone offset for the given date
-    // Create a date at midnight UTC, then format in the target timezone
-    const targetDate = new Date(`${dateStr}T${timeStr}:00Z`);
+    // V1 Simplified: Treat times as-is without timezone conversion
+    // The time 02:00 means 02:00 - no UTC offset calculation
+    const result = new Date(`${dateStr}T${timeStr}:00`);
 
-    try {
-      // Get the offset by comparing UTC time with formatted local time
-      const formatter = new Intl.DateTimeFormat('en-US', {
-        timeZone: timezone,
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false,
-      });
+    this.logger.debug(
+      `createDateInTimezone: ${dateStr} ${timeStr} -> ${result.toISOString()}`,
+    );
 
-      // Parse the time parts
-      const [hours, minutes] = timeStr.split(':').map(Number);
-
-      // Create a test date to find the offset
-      const testDate = new Date(`${dateStr}T12:00:00Z`); // Use noon to avoid DST edge cases
-      const parts = formatter.formatToParts(testDate);
-      const tzHour = parseInt(
-        parts.find((p) => p.type === 'hour')?.value || '12',
-      );
-
-      // Calculate offset: if timezone is UTC+2, noon UTC shows as 14:00 local
-      // So offset = local - UTC = 14 - 12 = 2 hours
-      const offsetHours = tzHour - 12;
-
-      // Now create the correct UTC date
-      // If user wants 02:00 in Lebanon (UTC+2), the UTC time is 00:00
-      const utcHours = hours - offsetHours;
-      const result = new Date(
-        `${dateStr}T${utcHours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:00Z`,
-      );
-
-      this.logger.debug(
-        `createDateInTimezone: ${dateStr} ${timeStr} in ${timezone} -> UTC ${result.toISOString()} (offset=${offsetHours}h)`,
-      );
-
-      return result;
-    } catch (error) {
-      // Fallback: just use the naive date (treat as UTC)
-      this.logger.warn(
-        `Failed to parse timezone ${timezone}, falling back to UTC`,
-      );
-      return new Date(`${dateStr}T${timeStr}:00Z`);
-    }
+    return result;
   }
 }
