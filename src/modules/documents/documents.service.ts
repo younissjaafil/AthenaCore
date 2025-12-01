@@ -248,6 +248,17 @@ export class DocumentsService {
     return documents.map((doc) => this.toResponseDto(doc));
   }
 
+  async findByCreatorWithVisibility(
+    creatorId: string,
+    visibility: 'public' | 'all' = 'public',
+  ): Promise<DocumentResponseDto[]> {
+    const documents =
+      visibility === 'all'
+        ? await this.documentsRepository.findByCreator(creatorId)
+        : await this.documentsRepository.findPublicByCreator(creatorId);
+    return documents.map((doc) => this.toResponseDto(doc));
+  }
+
   async findOne(id: string, agentId?: string): Promise<DocumentResponseDto> {
     const document = await this.documentsRepository.findById(id);
     if (!document) {

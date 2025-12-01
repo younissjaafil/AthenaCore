@@ -37,6 +37,18 @@ export class AgentsRepository {
     });
   }
 
+  async findPublicByCreator(creatorId: string): Promise<Agent[]> {
+    return this.agentRepository.find({
+      where: {
+        creatorId,
+        isPublic: true,
+        status: 'active',
+      },
+      relations: ['creator', 'creator.user'],
+      order: { createdAt: 'DESC' },
+    });
+  }
+
   async findPublic(): Promise<Agent[]> {
     return this.agentRepository.find({
       where: {

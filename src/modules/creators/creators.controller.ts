@@ -31,6 +31,12 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { UserRole } from '../../common/constants/roles.enum';
 import { User } from '../users/entities/user.entity';
 import { Public } from '../../common/decorators/public.decorator';
+import { AgentsService } from '../agents/agents.service';
+import { DocumentsService } from '../documents/documents.service';
+import { AvailabilityService } from '../sessions/availability.service';
+import { AgentResponseDto } from '../agents/dto/agent-response.dto';
+import { DocumentResponseDto } from '../documents/dto/document-response.dto';
+import { SessionSettingsResponseDto } from '../sessions/dto/session-settings.dto';
 
 @ApiTags('Creators')
 @Controller('creators')
@@ -38,6 +44,9 @@ export class CreatorsController {
   constructor(
     private readonly creatorsService: CreatorsService,
     private readonly followService: CreatorFollowService,
+    private readonly agentsService: AgentsService,
+    private readonly documentsService: DocumentsService,
+    private readonly availabilityService: AvailabilityService,
   ) {}
 
   @Get('me')
@@ -262,5 +271,67 @@ export class CreatorsController {
   @ApiQuery({ name: 'limit', required: false })
   async getTopCreators(@Query('limit') limit: number = 10) {
     return this.followService.getTopCreators(limit);
+  }
+
+  // ==================== CREATOR HUB ENDPOINTS ====================
+
+  @Get(':id/agents')
+  @Public()
+  @ApiOperation({
+    summary: 'Get creator agents (public or all based on visibility)',
+  })
+  @ApiQuery({ name: 'visibility', required: false, enum: ['public', 'all'] })
+  @ApiResponse({
+    status: 200,
+    description: 'List of creator agents',
+    type: [AgentResponseDto],
+  })
+  async getCreatorAgents(
+    @Param('id') creatorId: string,
+    @Query('visibility') visibility: 'public' | 'all' = 'public',
+  ): Promise<AgentResponseDto[]> {
+    // For public access, only return public agents
+    // 'all' visibility should only be used by authenticated owners (handled by frontend)
+    return this.agentsService.findByCreatorWithVisibility(
+      creatorId,
+      visibility,
+    );
+  }
+
+  @Get(':id/documents')
+  @Public()
+  @ApiOperation({
+    summary: 'Get creator documents (public or all based on visibility)',
+  })
+  @ApiQuery({ name: 'visibility', required: false, enum: ['public', 'all'] })
+  @ApiResponse({
+    status: 200,
+    description: 'List of creator documents',
+    type: [DocumentResponseDto],
+  })
+  async getCreatorDocuments(
+    @Param('id') creatorId: string,
+    @Query('visibility') visibility: 'public' | 'all' = 'public',
+  ): Promise<DocumentResponseDto[]> {
+    return this.documentsService.findByCreatorWithVisibility(
+      creatorId,
+      visibility,
+    );
+  }
+
+  @Get(':id/sessions/settings')
+  @Public()
+  @ApiOperation({
+    summary: 'Get creator session settings (availability preview)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Creator session settings',
+    type: SessionSettingsResponseDto,
+  })
+  async getCreatorSessionSettings(
+    @Param('id') creatorId: string,
+  ): Promise<SessionSettingsResponseDto> {
+    return this.availabilityService.getSessionSettings(creatorId);
   }
 }

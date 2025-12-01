@@ -53,6 +53,17 @@ export class AgentsService {
     return agents.map((agent) => this.toResponseDto(agent));
   }
 
+  async findByCreatorWithVisibility(
+    creatorId: string,
+    visibility: 'public' | 'all' = 'public',
+  ): Promise<AgentResponseDto[]> {
+    const agents =
+      visibility === 'all'
+        ? await this.agentsRepository.findByCreator(creatorId)
+        : await this.agentsRepository.findPublicByCreator(creatorId);
+    return agents.map((agent) => this.toResponseDto(agent));
+  }
+
   async findByCategory(category: string): Promise<AgentResponseDto[]> {
     const agents = await this.agentsRepository.findByCategory(category);
     return agents.map((agent) => this.toResponseDto(agent));

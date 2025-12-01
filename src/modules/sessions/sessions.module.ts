@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { SessionsController } from './sessions.controller';
 import { SessionsService } from './sessions.service';
@@ -26,7 +26,7 @@ import { AvailabilityRepository } from './repositories/availability.repository';
       Creator,
     ]),
     UsersModule,
-    CreatorsModule,
+    forwardRef(() => CreatorsModule),
   ],
   controllers: [SessionsController, AvailabilityController],
   providers: [

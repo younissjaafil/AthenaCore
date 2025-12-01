@@ -8,6 +8,7 @@ import {
   ProfileController,
   TestimonialsController,
 } from './profile.controller';
+import { UsersModule } from '../users/users.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import {
       User,
       Creator,
     ]),
+    UsersModule,
   ],
   controllers: [ProfileController, TestimonialsController],
   providers: [ProfileService],

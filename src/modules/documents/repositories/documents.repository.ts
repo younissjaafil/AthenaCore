@@ -117,4 +117,30 @@ export class DocumentsRepository {
       totalSize: documents.reduce((sum, d) => sum + Number(d.fileSize), 0),
     };
   }
+
+  async findByCreator(creatorId: string): Promise<Document[]> {
+    return this.repository
+      .createQueryBuilder('document')
+      .leftJoinAndSelect('document.agent', 'agent')
+      .where('agent.creator_id = :creatorId', { creatorId })
+      .andWhere('document.status = :status', {
+        status: DocumentStatus.PROCESSED,
+      })
+      .orderBy('document.created_at', 'DESC')
+      .getMany();
+  }
+
+  async findPublicByCreator(creatorId: string): Promise<Document[]> {
+    return this.repository
+      .createQueryBuilder('document')
+      .leftJoinAndSelect('document.agent', 'agent')
+      .where('agent.creator_id = :creatorId', { creatorId })
+      .andWhere('agent.is_public = :isPublic', { isPublic: true })
+      .andWhere('agent.status = :agentStatus', { agentStatus: 'active' })
+      .andWhere('document.status = :status', {
+        status: DocumentStatus.PROCESSED,
+      })
+      .orderBy('document.created_at', 'DESC')
+      .getMany();
+  }
 }
