@@ -57,6 +57,13 @@ export class PostCreatorResponseDto {
     lastName?: string;
     profileImageUrl?: string;
   };
+
+  @ApiPropertyOptional()
+  profile?: {
+    handle: string;
+    displayName?: string;
+    avatarUrl?: string;
+  };
 }
 
 export class PostResponseDto {

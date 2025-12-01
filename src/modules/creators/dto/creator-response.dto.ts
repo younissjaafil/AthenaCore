@@ -76,4 +76,13 @@ export class CreatorResponseDto {
     lastName?: string;
     profileImageUrl?: string;
   };
+
+  // Profile details (joined from UserProfile entity)
+  @ApiPropertyOptional()
+  profile?: {
+    handle: string;
+    displayName?: string;
+    avatarUrl?: string;
+    bannerUrl?: string;
+  };
 }

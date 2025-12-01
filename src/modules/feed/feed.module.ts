@@ -12,6 +12,7 @@ import {
 } from './entities';
 import { CreatorsModule } from '../creators/creators.module';
 import { UsersModule } from '../users/users.module';
+import { UserProfile } from '../profiles/entities/user-profile.entity';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { UsersModule } from '../users/users.module';
       PostLike,
       PostComment,
       CommentLike,
+      UserProfile,
     ]),
     forwardRef(() => CreatorsModule),
     UsersModule,

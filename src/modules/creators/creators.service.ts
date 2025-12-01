@@ -1,8 +1,6 @@
-import {
-  Injectable,
-  NotFoundException,
-  ConflictException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { CreatorsRepository } from './repositories/creators.repository';
 import { CreateCreatorDto } from './dto/create-creator.dto';
 import { UpdateCreatorDto } from './dto/update-creator.dto';
@@ -10,12 +8,15 @@ import { CreatorResponseDto } from './dto/creator-response.dto';
 import { Creator, CreatorStatus } from './entities/creator.entity';
 import { UsersService } from '../users/users.service';
 import { UserRole } from '../../common/constants/roles.enum';
+import { UserProfile } from '../profiles/entities/user-profile.entity';
 
 @Injectable()
 export class CreatorsService {
   constructor(
     private readonly creatorsRepository: CreatorsRepository,
     private readonly usersService: UsersService,
+    @InjectRepository(UserProfile)
+    private readonly profileRepo: Repository<UserProfile>,
   ) {}
 
   async create(
@@ -53,17 +54,17 @@ export class CreatorsService {
 
   async findAll(): Promise<CreatorResponseDto[]> {
     const creators = await this.creatorsRepository.findAll();
-    return creators.map((creator) => this.toResponseDto(creator));
+    return this.enrichCreatorsWithProfiles(creators);
   }
 
   async findVerified(): Promise<CreatorResponseDto[]> {
     const creators = await this.creatorsRepository.findVerified();
-    return creators.map((creator) => this.toResponseDto(creator));
+    return this.enrichCreatorsWithProfiles(creators);
   }
 
   async findAvailable(): Promise<CreatorResponseDto[]> {
     const creators = await this.creatorsRepository.findAvailable();
-    return creators.map((creator) => this.toResponseDto(creator));
+    return this.enrichCreatorsWithProfiles(creators);
   }
 
   async findOne(id: string): Promise<CreatorResponseDto> {
@@ -71,12 +72,12 @@ export class CreatorsService {
     if (!creator) {
       throw new NotFoundException(`Creator with ID ${id} not found`);
     }
-    return this.toResponseDto(creator);
+    return this.enrichCreatorWithProfile(creator);
   }
 
   async findByUserId(userId: string): Promise<CreatorResponseDto | null> {
     const creator = await this.creatorsRepository.findByUserId(userId);
-    return creator ? this.toResponseDto(creator) : null;
+    return creator ? this.enrichCreatorWithProfile(creator) : null;
   }
 
   async update(
@@ -103,7 +104,7 @@ export class CreatorsService {
     }
   }
 
-  toResponseDto(creator: Creator): CreatorResponseDto {
+  toResponseDto(creator: Creator, profile?: UserProfile): CreatorResponseDto {
     const response: CreatorResponseDto = {
       id: creator.id,
       userId: creator.userId,
@@ -138,6 +139,42 @@ export class CreatorsService {
       };
     }
 
+    if (profile) {
+      response.profile = {
+        handle: profile.handle,
+        displayName: profile.displayName,
+        avatarUrl: profile.avatarUrl,
+        bannerUrl: profile.bannerUrl,
+      };
+    }
+
     return response;
+  }
+
+  private async getProfileForUser(userId: string): Promise<UserProfile | null> {
+    return this.profileRepo.findOne({ where: { userId } });
+  }
+
+  private async enrichCreatorWithProfile(
+    creator: Creator,
+  ): Promise<CreatorResponseDto> {
+    const profile = await this.getProfileForUser(creator.userId);
+    return this.toResponseDto(creator, profile || undefined);
+  }
+
+  private async enrichCreatorsWithProfiles(
+    creators: Creator[],
+  ): Promise<CreatorResponseDto[]> {
+    const userIds = creators.map((c) => c.userId);
+    const profiles = await this.profileRepo
+      .createQueryBuilder('profile')
+      .where('profile.userId IN (:...userIds)', { userIds })
+      .getMany();
+
+    const profileMap = new Map(profiles.map((p) => [p.userId, p]));
+
+    return creators.map((creator) =>
+      this.toResponseDto(creator, profileMap.get(creator.userId)),
+    );
   }
 }

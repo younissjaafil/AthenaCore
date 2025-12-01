@@ -4,6 +4,8 @@ import {
   ForbiddenException,
   Logger,
 } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository, In } from 'typeorm';
 import { FeedRepository } from './repositories/feed.repository';
 import { CreatorsService } from '../creators/creators.service';
 import { CreatorFollowService } from '../creators/creator-follow.service';
@@ -19,6 +21,7 @@ import {
 } from './dto';
 import { Post, PostVisibility } from './entities/post.entity';
 import { PostComment } from './entities/post-comment.entity';
+import { UserProfile } from '../profiles/entities/user-profile.entity';
 
 @Injectable()
 export class FeedService {
@@ -28,6 +31,8 @@ export class FeedService {
     private readonly feedRepository: FeedRepository,
     private readonly creatorsService: CreatorsService,
     private readonly followService: CreatorFollowService,
+    @InjectRepository(UserProfile)
+    private readonly profileRepo: Repository<UserProfile>,
   ) {}
 
   // ==================== POSTS ====================
@@ -62,7 +67,12 @@ export class FeedService {
 
     this.logger.log(`Created post ${post.id} for creator ${creator.id}`);
 
-    return this.mapPostToResponse(fullPost, false);
+    // Get profile data
+    const profile = await this.profileRepo.findOne({
+      where: { userId },
+    });
+
+    return this.mapPostToResponse(fullPost, false, profile || undefined);
   }
 
   async updatePost(
@@ -86,7 +96,12 @@ export class FeedService {
       throw new NotFoundException('Post update failed');
     }
 
-    return this.mapPostToResponse(updatedPost, false);
+    // Get profile data
+    const profile = await this.profileRepo.findOne({
+      where: { userId },
+    });
+
+    return this.mapPostToResponse(updatedPost, false, profile || undefined);
   }
 
   async deletePost(userId: string, postId: string): Promise<void> {
@@ -122,7 +137,12 @@ export class FeedService {
       ? await this.feedRepository.hasUserLikedPost(postId, userId)
       : false;
 
-    return this.mapPostToResponse(post, isLiked);
+    // Get profile data
+    const profile = await this.profileRepo.findOne({
+      where: { userId: post.creator.userId },
+    });
+
+    return this.mapPostToResponse(post, isLiked, profile || undefined);
   }
 
   async getCreatorPosts(
@@ -151,9 +171,16 @@ export class FeedService {
       ? await this.feedRepository.getUserLikedPostIds(postIds, userId)
       : [];
 
+    // Get profile data for posts
+    const profileMap = await this.getProfilesForPosts(posts);
+
     return {
       posts: posts.map((post) =>
-        this.mapPostToResponse(post, likedPostIds.includes(post.id)),
+        this.mapPostToResponse(
+          post,
+          likedPostIds.includes(post.id),
+          profileMap.get(post.creator.userId),
+        ),
       ),
       total,
       page,
@@ -195,9 +222,16 @@ export class FeedService {
       userId,
     );
 
+    // Get profile data for posts
+    const profileMap = await this.getProfilesForPosts(posts);
+
     return {
       posts: posts.map((post) =>
-        this.mapPostToResponse(post, likedPostIds.includes(post.id)),
+        this.mapPostToResponse(
+          post,
+          likedPostIds.includes(post.id),
+          profileMap.get(post.creator.userId),
+        ),
       ),
       total,
       page,
@@ -234,9 +268,16 @@ export class FeedService {
       ? await this.feedRepository.getUserLikedPostIds(postIds, userId)
       : [];
 
+    // Get profile data for posts
+    const profileMap = await this.getProfilesForPosts(posts);
+
     return {
       posts: posts.map((post) =>
-        this.mapPostToResponse(post, likedPostIds.includes(post.id)),
+        this.mapPostToResponse(
+          post,
+          likedPostIds.includes(post.id),
+          profileMap.get(post.creator.userId),
+        ),
       ),
       total,
       page,
@@ -440,7 +481,11 @@ export class FeedService {
     }
   }
 
-  private mapPostToResponse(post: Post, isLiked: boolean): PostResponseDto {
+  private mapPostToResponse(
+    post: Post,
+    isLiked: boolean,
+    profile?: UserProfile,
+  ): PostResponseDto {
     return {
       id: post.id,
       creatorId: post.creatorId,
@@ -475,11 +520,31 @@ export class FeedService {
           lastName: post.creator.user.lastName,
           profileImageUrl: post.creator.user.profileImageUrl,
         },
+        profile: profile
+          ? {
+              handle: profile.handle,
+              displayName: profile.displayName,
+              avatarUrl: profile.avatarUrl,
+            }
+          : undefined,
       },
       isLiked,
       createdAt: post.createdAt,
       updatedAt: post.updatedAt,
     };
+  }
+
+  private async getProfilesForPosts(
+    posts: Post[],
+  ): Promise<Map<string, UserProfile>> {
+    const userIds = [...new Set(posts.map((p) => p.creator.userId))];
+    if (userIds.length === 0) return new Map();
+
+    const profiles = await this.profileRepo.find({
+      where: { userId: In(userIds) },
+    });
+
+    return new Map(profiles.map((p) => [p.userId, p]));
   }
 
   private mapCommentToResponse(

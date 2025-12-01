@@ -8,6 +8,7 @@ import { Creator } from './entities/creator.entity';
 import { CreatorFollow } from './entities/creator-follow.entity';
 import { CreatorStats } from './entities/creator-stats.entity';
 import { User } from '../users/entities/user.entity';
+import { UserProfile } from '../profiles/entities/user-profile.entity';
 import { UsersModule } from '../users/users.module';
 import { AgentsModule } from '../agents/agents.module';
 import { DocumentsModule } from '../documents/documents.module';
@@ -15,7 +16,13 @@ import { SessionsModule } from '../sessions/sessions.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Creator, CreatorFollow, CreatorStats, User]),
+    TypeOrmModule.forFeature([
+      Creator,
+      CreatorFollow,
+      CreatorStats,
+      User,
+      UserProfile,
+    ]),
     UsersModule,
     forwardRef(() => AgentsModule),
     forwardRef(() => DocumentsModule),
