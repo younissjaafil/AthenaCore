@@ -37,39 +37,8 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 export class ProfileController {
   constructor(private readonly profileService: ProfileService) {}
 
-  // ==================== PUBLIC PROFILE ROUTES ====================
-
-  @Get('handle/:handle')
-  @ApiOperation({ summary: 'Get profile by handle' })
-  @ApiParam({ name: 'handle', description: 'Profile handle (e.g., johndoe)' })
-  @ApiResponse({ status: 200, type: ProfileResponseDto })
-  async getProfileByHandle(
-    @Param('handle') handle: string,
-    @CurrentUser('id') currentUserId?: string,
-  ): Promise<ProfileResponseDto> {
-    return this.profileService.getProfileByHandle(handle, currentUserId);
-  }
-
-  @Get('user/:userId')
-  @ApiOperation({ summary: 'Get profile by user ID' })
-  @ApiResponse({ status: 200, type: ProfileResponseDto })
-  async getProfileByUserId(
-    @Param('userId') userId: string,
-    @CurrentUser('id') currentUserId?: string,
-  ): Promise<ProfileResponseDto> {
-    return this.profileService.getProfileByUserId(userId, currentUserId);
-  }
-
-  @Get('check-handle/:handle')
-  @ApiOperation({ summary: 'Check if handle is available' })
-  async checkHandle(
-    @Param('handle') handle: string,
-  ): Promise<{ available: boolean }> {
-    const available = await this.profileService.isHandleAvailable(handle);
-    return { available };
-  }
-
   // ==================== AUTHENTICATED PROFILE ROUTES ====================
+  // Note: These MUST come before parameterized routes to avoid /me being matched as /:handle
 
   @Get('me')
   @UseGuards(ClerkAuthGuard)
@@ -104,6 +73,38 @@ export class ProfileController {
     @Body() dto: UpdateProfileDto,
   ): Promise<ProfileResponseDto> {
     return this.profileService.updateProfile(userId, dto);
+  }
+
+  // ==================== PUBLIC PROFILE ROUTES ====================
+
+  @Get('handle/:handle')
+  @ApiOperation({ summary: 'Get profile by handle' })
+  @ApiParam({ name: 'handle', description: 'Profile handle (e.g., johndoe)' })
+  @ApiResponse({ status: 200, type: ProfileResponseDto })
+  async getProfileByHandle(
+    @Param('handle') handle: string,
+    @CurrentUser('id') currentUserId?: string,
+  ): Promise<ProfileResponseDto> {
+    return this.profileService.getProfileByHandle(handle, currentUserId);
+  }
+
+  @Get('user/:userId')
+  @ApiOperation({ summary: 'Get profile by user ID' })
+  @ApiResponse({ status: 200, type: ProfileResponseDto })
+  async getProfileByUserId(
+    @Param('userId') userId: string,
+    @CurrentUser('id') currentUserId?: string,
+  ): Promise<ProfileResponseDto> {
+    return this.profileService.getProfileByUserId(userId, currentUserId);
+  }
+
+  @Get('check-handle/:handle')
+  @ApiOperation({ summary: 'Check if handle is available' })
+  async checkHandle(
+    @Param('handle') handle: string,
+  ): Promise<{ available: boolean }> {
+    const available = await this.profileService.isHandleAvailable(handle);
+    return { available };
   }
 
   // ==================== FOLLOW ROUTES ====================
