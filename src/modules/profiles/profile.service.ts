@@ -40,16 +40,48 @@ export class ProfileService {
   // ==================== PROFILE METHODS ====================
 
   /**
+   * Check if a string is a valid UUID
+   */
+  private isUUID(str: string): boolean {
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(str);
+  }
+
+  /**
    * Get profile by handle (public route)
+   * Also supports lookup by userId or username as fallback
    */
   async getProfileByHandle(
     handle: string,
     currentUserId?: string,
   ): Promise<ProfileResponseDto> {
-    const profile = await this.profileRepo.findOne({
+    // First, try to find by handle
+    let profile = await this.profileRepo.findOne({
       where: { handle: handle.toLowerCase() },
       relations: ['user'],
     });
+
+    // If not found and looks like a UUID, try to find by userId
+    if (!profile && this.isUUID(handle)) {
+      profile = await this.profileRepo.findOne({
+        where: { userId: handle },
+        relations: ['user'],
+      });
+    }
+
+    // If still not found, try to find by user's username
+    if (!profile) {
+      const user = await this.userRepo.findOne({
+        where: { username: handle.toLowerCase() },
+      });
+      if (user) {
+        profile = await this.profileRepo.findOne({
+          where: { userId: user.id },
+          relations: ['user'],
+        });
+      }
+    }
 
     if (!profile) {
       throw new NotFoundException(`Profile @${handle} not found`);
