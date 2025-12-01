@@ -133,6 +133,123 @@ export class CreatorsController {
     return this.creatorsService.findAvailable();
   }
 
+  @Get('top/ranked')
+  @Public()
+  @ApiOperation({ summary: 'Get top ranked creators' })
+  @ApiQuery({ name: 'limit', required: false })
+  async getTopCreators(@Query('limit') limit: number = 10) {
+    return this.followService.getTopCreators(limit);
+  }
+
+  @Get(':id/is-following')
+  @UseGuards(ClerkAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Check if current user is following a creator' })
+  @ApiResponse({ status: 200, description: 'Following status' })
+  async isFollowing(
+    @CurrentUser() user: User,
+    @Param('id') creatorId: string,
+  ): Promise<{ isFollowing: boolean }> {
+    const isFollowing = await this.followService.isFollowing(
+      user.id,
+      creatorId,
+    );
+    return { isFollowing };
+  }
+
+  @Get(':id/followers-count')
+  @Public()
+  @ApiOperation({ summary: 'Get followers count for a creator' })
+  @ApiResponse({ status: 200, description: 'Followers count' })
+  async getFollowersCount(
+    @Param('id') creatorId: string,
+  ): Promise<{ count: number }> {
+    const count = await this.followService.getFollowersCount(creatorId);
+    return { count };
+  }
+
+  @Get(':id/stats')
+  @Public()
+  @ApiOperation({ summary: 'Get creator stats' })
+  @ApiResponse({ status: 200, description: 'Creator stats' })
+  async getCreatorStats(@Param('id') creatorId: string) {
+    const stats = await this.followService.getCreatorStats(creatorId);
+    if (!stats) {
+      // Return empty stats if not found
+      return {
+        followersCount: 0,
+        rankScore: 0,
+        rankPosition: 0,
+        totalSessions: 0,
+        averageRating: 0,
+      };
+    }
+    return stats;
+  }
+
+  @Get(':id/followers')
+  @Public()
+  @ApiOperation({ summary: 'Get followers list for a creator' })
+  @ApiQuery({ name: 'page', required: false })
+  @ApiQuery({ name: 'limit', required: false })
+  async getCreatorFollowers(
+    @Param('id') creatorId: string,
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 20,
+  ) {
+    return this.followService.getCreatorFollowers(creatorId, page, limit);
+  }
+
+  @Get(':id/agents')
+  @Public()
+  @ApiOperation({
+    summary: 'Get public agents for a creator',
+  })
+  @ApiQuery({ name: 'visibility', required: false, enum: ['public', 'all'] })
+  @ApiResponse({
+    status: 200,
+    description: 'List of agents',
+    type: [AgentResponseDto],
+  })
+  async getCreatorAgents(
+    @Param('id') creatorId: string,
+    @Query('visibility') visibility: 'public' | 'all' = 'public',
+  ): Promise<AgentResponseDto[]> {
+    return this.agentsService.findByCreator(creatorId, visibility === 'all');
+  }
+
+  @Get(':id/documents')
+  @Public()
+  @ApiOperation({
+    summary: 'Get public documents for a creator',
+  })
+  @ApiQuery({ name: 'visibility', required: false, enum: ['public', 'all'] })
+  @ApiResponse({
+    status: 200,
+    description: 'List of documents',
+    type: [DocumentResponseDto],
+  })
+  async getCreatorDocuments(
+    @Param('id') creatorId: string,
+    @Query('visibility') visibility: 'public' | 'all' = 'public',
+  ): Promise<DocumentResponseDto[]> {
+    return this.documentsService.findByCreator(creatorId, visibility === 'all');
+  }
+
+  @Get(':id/sessions/settings')
+  @Public()
+  @ApiOperation({ summary: 'Get session settings for a creator' })
+  @ApiResponse({
+    status: 200,
+    description: 'Session settings',
+    type: SessionSettingsResponseDto,
+  })
+  async getCreatorSessionSettings(
+    @Param('id') creatorId: string,
+  ): Promise<SessionSettingsResponseDto> {
+    return this.availabilityService.getSettings(creatorId);
+  }
+
   @Get(':id')
   @Public()
   @ApiOperation({ summary: 'Get creator by ID' })
@@ -204,134 +321,5 @@ export class CreatorsController {
     @Param('id') creatorId: string,
   ): Promise<void> {
     await this.followService.unfollowCreator(user.id, creatorId);
-  }
-
-  @Get(':id/followers-count')
-  @Public()
-  @ApiOperation({ summary: 'Get followers count for a creator' })
-  @ApiResponse({ status: 200, description: 'Followers count' })
-  async getFollowersCount(
-    @Param('id') creatorId: string,
-  ): Promise<{ count: number }> {
-    const count = await this.followService.getFollowersCount(creatorId);
-    return { count };
-  }
-
-  @Get(':id/stats')
-  @Public()
-  @ApiOperation({ summary: 'Get creator stats' })
-  @ApiResponse({ status: 200, description: 'Creator stats' })
-  async getCreatorStats(@Param('id') creatorId: string) {
-    const stats = await this.followService.getCreatorStats(creatorId);
-    if (!stats) {
-      // Return empty stats if not found
-      return {
-        followersCount: 0,
-        rankScore: 0,
-        rankPosition: 0,
-        totalSessions: 0,
-        averageRating: 0,
-      };
-    }
-    return stats;
-  }
-
-  @Get(':id/is-following')
-  @UseGuards(ClerkAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Check if current user is following a creator' })
-  @ApiResponse({ status: 200, description: 'Following status' })
-  async isFollowing(
-    @CurrentUser() user: User,
-    @Param('id') creatorId: string,
-  ): Promise<{ isFollowing: boolean }> {
-    const isFollowing = await this.followService.isFollowing(
-      user.id,
-      creatorId,
-    );
-    return { isFollowing };
-  }
-
-  @Get(':id/followers')
-  @Public()
-  @ApiOperation({ summary: 'Get followers list for a creator' })
-  @ApiQuery({ name: 'page', required: false })
-  @ApiQuery({ name: 'limit', required: false })
-  async getCreatorFollowers(
-    @Param('id') creatorId: string,
-    @Query('page') page: number = 1,
-    @Query('limit') limit: number = 20,
-  ) {
-    return this.followService.getCreatorFollowers(creatorId, page, limit);
-  }
-
-  @Get('top/ranked')
-  @Public()
-  @ApiOperation({ summary: 'Get top ranked creators' })
-  @ApiQuery({ name: 'limit', required: false })
-  async getTopCreators(@Query('limit') limit: number = 10) {
-    return this.followService.getTopCreators(limit);
-  }
-
-  // ==================== CREATOR HUB ENDPOINTS ====================
-
-  @Get(':id/agents')
-  @Public()
-  @ApiOperation({
-    summary: 'Get creator agents (public or all based on visibility)',
-  })
-  @ApiQuery({ name: 'visibility', required: false, enum: ['public', 'all'] })
-  @ApiResponse({
-    status: 200,
-    description: 'List of creator agents',
-    type: [AgentResponseDto],
-  })
-  async getCreatorAgents(
-    @Param('id') creatorId: string,
-    @Query('visibility') visibility: 'public' | 'all' = 'public',
-  ): Promise<AgentResponseDto[]> {
-    // For public access, only return public agents
-    // 'all' visibility should only be used by authenticated owners (handled by frontend)
-    return this.agentsService.findByCreatorWithVisibility(
-      creatorId,
-      visibility,
-    );
-  }
-
-  @Get(':id/documents')
-  @Public()
-  @ApiOperation({
-    summary: 'Get creator documents (public or all based on visibility)',
-  })
-  @ApiQuery({ name: 'visibility', required: false, enum: ['public', 'all'] })
-  @ApiResponse({
-    status: 200,
-    description: 'List of creator documents',
-    type: [DocumentResponseDto],
-  })
-  async getCreatorDocuments(
-    @Param('id') creatorId: string,
-    @Query('visibility') visibility: 'public' | 'all' = 'public',
-  ): Promise<DocumentResponseDto[]> {
-    return this.documentsService.findByCreatorWithVisibility(
-      creatorId,
-      visibility,
-    );
-  }
-
-  @Get(':id/sessions/settings')
-  @Public()
-  @ApiOperation({
-    summary: 'Get creator session settings (availability preview)',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Creator session settings',
-    type: SessionSettingsResponseDto,
-  })
-  async getCreatorSessionSettings(
-    @Param('id') creatorId: string,
-  ): Promise<SessionSettingsResponseDto> {
-    return this.availabilityService.getSessionSettings(creatorId);
   }
 }
