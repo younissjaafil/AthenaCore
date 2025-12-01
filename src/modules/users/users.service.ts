@@ -121,7 +121,6 @@ export class UsersService {
       lastName: clerkUserData.lastName,
       profileImageUrl: clerkUserData.profileImageUrl,
       isAdmin: false,
-      hasCompletedOnboarding: false,
     });
   }
 
@@ -170,7 +169,6 @@ export class UsersService {
       roles: user.roles,
       isCreator: user.isCreator,
       isAdmin: user.isAdmin,
-      hasCompletedOnboarding: user.hasCompletedOnboarding,
       isActive: user.isActive,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,

@@ -20,16 +20,19 @@ async function clearDatabase() {
     AND tablename != 'migrations'
   `);
 
-  console.log('Tables found:', tables.map((t: any) => t.tablename));
+  console.log(
+    'Tables found:',
+    tables.map((t: any) => t.tablename),
+  );
 
   // Disable foreign key checks and truncate all tables
   await dataSource.query('SET session_replication_role = replica;');
-  
+
   for (const { tablename } of tables) {
     console.log(`Truncating ${tablename}...`);
     await dataSource.query(`TRUNCATE TABLE "${tablename}" CASCADE;`);
   }
-  
+
   await dataSource.query('SET session_replication_role = DEFAULT;');
 
   console.log('All tables cleared!');

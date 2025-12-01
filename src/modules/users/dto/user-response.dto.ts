@@ -35,9 +35,6 @@ export class UserResponseDto {
   @ApiProperty({ example: false, description: 'Computed from roles array' })
   isAdmin: boolean;
 
-  @ApiProperty({ example: false })
-  hasCompletedOnboarding: boolean;
-
   @ApiProperty({ example: true })
   isActive: boolean;
 
