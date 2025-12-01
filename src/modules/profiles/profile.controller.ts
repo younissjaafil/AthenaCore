@@ -31,6 +31,7 @@ import {
 } from './dto';
 import { ClerkAuthGuard } from '../auth/guards/clerk-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { Public } from '../../common/decorators/public.decorator';
 
 @ApiTags('Profiles')
 @Controller('profiles')
@@ -77,27 +78,28 @@ export class ProfileController {
 
   // ==================== PUBLIC PROFILE ROUTES ====================
 
+  @Public()
   @Get('handle/:handle')
-  @ApiOperation({ summary: 'Get profile by handle' })
+  @ApiOperation({ summary: 'Get profile by handle (public)' })
   @ApiParam({ name: 'handle', description: 'Profile handle (e.g., johndoe)' })
   @ApiResponse({ status: 200, type: ProfileResponseDto })
   async getProfileByHandle(
     @Param('handle') handle: string,
-    @CurrentUser('id') currentUserId?: string,
   ): Promise<ProfileResponseDto> {
-    return this.profileService.getProfileByHandle(handle, currentUserId);
+    return this.profileService.getProfileByHandle(handle);
   }
 
+  @Public()
   @Get('user/:userId')
-  @ApiOperation({ summary: 'Get profile by user ID' })
+  @ApiOperation({ summary: 'Get profile by user ID (public)' })
   @ApiResponse({ status: 200, type: ProfileResponseDto })
   async getProfileByUserId(
     @Param('userId') userId: string,
-    @CurrentUser('id') currentUserId?: string,
   ): Promise<ProfileResponseDto> {
-    return this.profileService.getProfileByUserId(userId, currentUserId);
+    return this.profileService.getProfileByUserId(userId);
   }
 
+  @Public()
   @Get('check-handle/:handle')
   @ApiOperation({ summary: 'Check if handle is available' })
   async checkHandle(
@@ -133,6 +135,7 @@ export class ProfileController {
     return this.profileService.unfollowUser(followerId, followingId);
   }
 
+  @Public()
   @Get(':userId/followers')
   @ApiOperation({ summary: 'Get followers of a user' })
   @ApiQuery({ name: 'page', required: false })
@@ -145,6 +148,7 @@ export class ProfileController {
     return this.profileService.getFollowers(userId, page, limit);
   }
 
+  @Public()
   @Get(':userId/following')
   @ApiOperation({ summary: 'Get users that a user is following' })
   @ApiQuery({ name: 'page', required: false })
@@ -165,6 +169,7 @@ export class ProfileController {
 export class TestimonialsController {
   constructor(private readonly profileService: ProfileService) {}
 
+  @Public()
   @Get()
   @ApiOperation({ summary: 'Get testimonials for a creator' })
   @ApiQuery({ name: 'page', required: false })
@@ -177,6 +182,7 @@ export class TestimonialsController {
     return this.profileService.getCreatorTestimonials(creatorId, page, limit);
   }
 
+  @Public()
   @Get('stats')
   @ApiOperation({ summary: 'Get testimonial statistics for a creator' })
   async getStats(
