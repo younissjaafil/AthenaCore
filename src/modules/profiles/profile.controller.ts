@@ -29,7 +29,7 @@ import {
   TestimonialResponseDto,
   TestimonialsStatsDto,
 } from './dto';
-import { ClerkAuthGuard } from '../../common/guards/clerk-auth.guard';
+import { ClerkAuthGuard } from '../auth/guards/clerk-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @ApiTags('Profiles')
