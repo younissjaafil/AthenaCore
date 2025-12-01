@@ -176,6 +176,27 @@ export class UsersService {
   }
 
   /**
+   * Public profile response - less sensitive data
+   */
+  toPublicResponseDto(user: User): UserResponseDto {
+    return {
+      id: user.id,
+      email: '', // Don't expose email publicly
+      username: user.username,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      fullName: user.fullName,
+      profileImageUrl: user.profileImageUrl,
+      roles: user.roles,
+      isCreator: user.isCreator,
+      isAdmin: false, // Don't expose admin status publicly
+      isActive: user.isActive,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    };
+  }
+
+  /**
    * Add creator role to user (enable creator power)
    */
   async enableCreatorPower(userId: string): Promise<User> {

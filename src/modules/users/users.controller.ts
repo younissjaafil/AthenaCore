@@ -8,6 +8,7 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  NotFoundException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -42,8 +43,10 @@ export class UsersController {
     const user = await this.usersService.findOrCreate({
       sub: clerkUser.sub || clerkUser.clerkId,
       email: clerkUser.email,
+      username: clerkUser.username,
       firstName: clerkUser.firstName,
       lastName: clerkUser.lastName,
+      profileImageUrl: clerkUser.profileImageUrl || clerkUser.picture,
     });
     return this.usersService.toResponseDto(user);
   }
@@ -71,63 +74,21 @@ export class UsersController {
     return this.usersService.toResponseDto(updated);
   }
 
-  @Get()
-  @UseGuards(ClerkAuthGuard, RolesGuard)
-  @Roles('admin')
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get all users (Admin only)' })
+  @Get(':username')
+  @ApiOperation({ summary: 'Get user public profile by username (public)' })
   @ApiResponse({
     status: 200,
-    description: 'List of all users',
-    type: [UserResponseDto],
-  })
-  async findAll(): Promise<UserResponseDto[]> {
-    const users = await this.usersService.findAll();
-    return users.map((user) => this.usersService.toResponseDto(user));
-  }
-
-  @Get(':id')
-  @UseGuards(ClerkAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get user by ID' })
-  @ApiResponse({
-    status: 200,
-    description: 'User found',
+    description: 'User public profile',
     type: UserResponseDto,
   })
   @ApiResponse({ status: 404, description: 'User not found' })
-  async findOne(@Param('id') id: string): Promise<UserResponseDto> {
-    const user = await this.usersService.findOne(id);
-    return this.usersService.toResponseDto(user);
-  }
-
-  @Patch(':id')
-  @UseGuards(ClerkAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Update user' })
-  @ApiResponse({
-    status: 200,
-    description: 'User updated',
-    type: UserResponseDto,
-  })
-  @ApiResponse({ status: 404, description: 'User not found' })
-  async update(
-    @Param('id') id: string,
-    @Body() updateUserDto: UpdateUserDto,
+  async findByUsername(
+    @Param('username') username: string,
   ): Promise<UserResponseDto> {
-    const user = await this.usersService.update(id, updateUserDto);
-    return this.usersService.toResponseDto(user);
-  }
-
-  @Delete(':id')
-  @UseGuards(ClerkAuthGuard, RolesGuard)
-  @Roles('admin')
-  @ApiBearerAuth()
-  @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Delete user (Admin only)' })
-  @ApiResponse({ status: 204, description: 'User deleted' })
-  @ApiResponse({ status: 404, description: 'User not found' })
-  async remove(@Param('id') id: string): Promise<void> {
-    await this.usersService.remove(id);
+    const user = await this.usersService.findByUsername(username);
+    if (!user) {
+      throw new NotFoundException(`User with username ${username} not found`);
+    }
+    return this.usersService.toPublicResponseDto(user);
   }
 }
