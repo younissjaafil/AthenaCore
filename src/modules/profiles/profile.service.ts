@@ -56,54 +56,127 @@ export class ProfileService {
     handle: string,
     currentUserId?: string,
   ): Promise<ProfileResponseDto> {
+    this.logger.debug(`Looking up profile by handle: ${handle}`);
+
     // First, try to find by handle
     let profile = await this.profileRepo.findOne({
       where: { handle: handle.toLowerCase() },
       relations: ['user'],
     });
 
+    if (profile) {
+      this.logger.debug(`Found profile by handle: ${profile.id}`);
+      return this.enrichProfileResponse(profile, currentUserId);
+    }
+
     // If not found and looks like a UUID, try to find by userId
-    if (!profile && this.isUUID(handle)) {
+    if (this.isUUID(handle)) {
+      this.logger.debug(`Trying lookup by userId: ${handle}`);
       profile = await this.profileRepo.findOne({
         where: { userId: handle },
         relations: ['user'],
       });
+
+      if (profile) {
+        this.logger.debug(`Found profile by userId: ${profile.id}`);
+        return this.enrichProfileResponse(profile, currentUserId);
+      }
     }
 
-    // If still not found, try to find by user's username
-    if (!profile) {
-      const user = await this.userRepo.findOne({
-        where: { username: handle.toLowerCase() },
+    // Try to find by user's username
+    this.logger.debug(`Trying lookup by username: ${handle}`);
+    const user = await this.userRepo.findOne({
+      where: { username: handle.toLowerCase() },
+    });
+
+    if (user) {
+      this.logger.debug(`Found user by username: ${user.id}`);
+      profile = await this.profileRepo.findOne({
+        where: { userId: user.id },
+        relations: ['user'],
       });
-      if (user) {
+
+      if (profile) {
+        this.logger.debug(`Found profile for user: ${profile.id}`);
+        return this.enrichProfileResponse(profile, currentUserId);
+      }
+
+      // User exists but no profile - create one
+      this.logger.debug(`Creating profile for user: ${user.id}`);
+      const newProfile = this.profileRepo.create({
+        userId: user.id,
+        handle: user.username?.toLowerCase() || handle.toLowerCase(),
+        displayName: user.fullName || user.email,
+        avatarUrl: user.profileImageUrl,
+      });
+
+      try {
+        const savedProfile = await this.profileRepo.save(newProfile);
+        savedProfile.user = user;
+        return this.enrichProfileResponse(savedProfile, currentUserId);
+      } catch (err) {
+        this.logger.warn(`Failed to create profile: ${err.message}`);
+        // Handle conflict - profile might exist with different handle
         profile = await this.profileRepo.findOne({
           where: { userId: user.id },
           relations: ['user'],
         });
+        if (profile) {
+          return this.enrichProfileResponse(profile, currentUserId);
+        }
       }
     }
 
-    if (!profile) {
-      throw new NotFoundException(`Profile @${handle} not found`);
-    }
-
-    return this.enrichProfileResponse(profile, currentUserId);
+    this.logger.debug(`Profile not found for handle: ${handle}`);
+    throw new NotFoundException(`Profile @${handle} not found`);
   }
 
   /**
    * Get profile by user ID
+   * Auto-creates profile if user exists but profile doesn't
    */
   async getProfileByUserId(
     userId: string,
     currentUserId?: string,
   ): Promise<ProfileResponseDto> {
-    const profile = await this.profileRepo.findOne({
+    let profile = await this.profileRepo.findOne({
       where: { userId },
       relations: ['user'],
     });
 
     if (!profile) {
-      throw new NotFoundException('Profile not found');
+      // Try to auto-create profile for user
+      const user = await this.userRepo.findOne({ where: { id: userId } });
+      if (user) {
+        this.logger.debug(`Auto-creating profile for user: ${userId}`);
+        const handle = user.username?.toLowerCase() ||
+          user.email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
+
+        const newProfile = this.profileRepo.create({
+          userId: user.id,
+          handle,
+          displayName: user.fullName || user.email,
+          avatarUrl: user.profileImageUrl,
+        });
+
+        try {
+          profile = await this.profileRepo.save(newProfile);
+          profile.user = user;
+        } catch (err) {
+          this.logger.warn(`Failed to auto-create profile: ${err.message}`);
+          // Try with unique handle
+          const uniqueHandle = `${handle}${Date.now() % 10000}`;
+          newProfile.handle = uniqueHandle;
+          try {
+            profile = await this.profileRepo.save(newProfile);
+            profile.user = user;
+          } catch {
+            throw new NotFoundException('Profile not found and could not be created');
+          }
+        }
+      } else {
+        throw new NotFoundException('Profile not found');
+      }
     }
 
     return this.enrichProfileResponse(profile, currentUserId);
