@@ -154,10 +154,9 @@ export class FeedRepository {
     }
 
     // Order by engagement (likes + comments) and recency
-    qb.orderBy('post.likesCount + post.commentsCount', 'DESC').addOrderBy(
-      'post.createdAt',
-      'DESC',
-    );
+    qb.addSelect('(post.likesCount + post.commentsCount)', 'engagement_score')
+      .orderBy('engagement_score', 'DESC')
+      .addOrderBy('post.createdAt', 'DESC');
 
     const [posts, total] = await qb
       .skip((page - 1) * limit)
