@@ -31,6 +31,7 @@ import { SessionsModule } from './modules/sessions/sessions.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { HealthModule } from './modules/health/health.module';
+import { FeedModule } from './modules/feed/feed.module';
 
 @Module({
   imports: [
@@ -59,6 +60,7 @@ import { HealthModule } from './modules/health/health.module';
     NotificationsModule,
     AdminModule,
     HealthModule,
+    FeedModule,
   ],
   controllers: [AppController],
   providers: [

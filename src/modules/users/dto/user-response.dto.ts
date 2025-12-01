@@ -29,6 +29,33 @@ export class UserResponseDto {
   @ApiProperty({ example: false })
   hasCompletedOnboarding: boolean;
 
+  @ApiProperty({
+    example: false,
+    description: 'User wants to learn from creators',
+  })
+  isLearner: boolean;
+
+  @ApiProperty({
+    example: false,
+    description: 'User intends to become a creator',
+  })
+  isCreatorIntent: boolean;
+
+  @ApiProperty({
+    example: false,
+    description: 'User has completed initial discovery/explore phase',
+  })
+  hasCompletedDiscovery: boolean;
+
+  @ApiPropertyOptional({ description: 'When user selected their intent' })
+  intentSelectedAt?: Date;
+
+  @ApiPropertyOptional({
+    example: 'creator-dashboard',
+    description: 'Last activity context for smart redirects',
+  })
+  lastActivityContext?: string;
+
   @ApiProperty({ example: true })
   isActive: boolean;
 

@@ -151,9 +151,62 @@ export class UsersService {
       role: user.role,
       isAdmin: user.isAdmin,
       hasCompletedOnboarding: user.hasCompletedOnboarding,
+      isLearner: user.isLearner,
+      isCreatorIntent: user.isCreatorIntent,
+      hasCompletedDiscovery: user.hasCompletedDiscovery,
+      intentSelectedAt: user.intentSelectedAt,
+      lastActivityContext: user.lastActivityContext,
       isActive: user.isActive,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     };
+  }
+
+  /**
+   * Set user's initial intent (Learn vs Earn)
+   */
+  async setUserIntent(userId: string, intent: 'learn' | 'earn'): Promise<User> {
+    const user = await this.findOne(userId);
+
+    const updateData: Partial<User> = {
+      intentSelectedAt: new Date(),
+    };
+
+    if (intent === 'learn') {
+      updateData.isLearner = true;
+      updateData.isCreatorIntent = false;
+    } else {
+      updateData.isLearner = false;
+      updateData.isCreatorIntent = true;
+    }
+
+    const updated = await this.usersRepository.update(userId, updateData);
+    if (!updated) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+
+    return updated;
+  }
+
+  /**
+   * Mark discovery phase as completed
+   */
+  async completeDiscovery(userId: string): Promise<User> {
+    const updated = await this.usersRepository.update(userId, {
+      hasCompletedDiscovery: true,
+    });
+    if (!updated) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+    return updated;
+  }
+
+  /**
+   * Update last activity context for smart redirects
+   */
+  async updateActivityContext(userId: string, context: string): Promise<void> {
+    await this.usersRepository.update(userId, {
+      lastActivityContext: context,
+    });
   }
 }

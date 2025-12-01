@@ -20,6 +20,7 @@ import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserResponseDto } from './dto/user-response.dto';
+import { SetIntentDto } from './dto/set-intent.dto';
 import { ClerkAuthGuard } from '../auth/guards/clerk-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -121,6 +122,49 @@ export class UsersController {
   ): Promise<UserResponseDto> {
     const user = await this.usersService.update(id, updateUserDto);
     return this.usersService.toResponseDto(user);
+  }
+
+  @Post('me/intent')
+  @UseGuards(ClerkAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Set user intent (learn vs earn)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Intent set successfully',
+    type: UserResponseDto,
+  })
+  async setIntent(
+    @CurrentUser() clerkUser: any,
+    @Body() setIntentDto: SetIntentDto,
+  ): Promise<UserResponseDto> {
+    const user = await this.usersService.findByClerkIdOrThrow(
+      clerkUser.sub || clerkUser.clerkId,
+    );
+    const updated = await this.usersService.setUserIntent(
+      user.id,
+      setIntentDto.intent,
+    );
+    return this.usersService.toResponseDto(updated);
+  }
+
+  @Post('me/complete-discovery')
+  @UseGuards(ClerkAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Mark discovery phase as completed' })
+  @ApiResponse({
+    status: 200,
+    description: 'Discovery completed',
+    type: UserResponseDto,
+  })
+  async completeDiscovery(
+    @CurrentUser() clerkUser: any,
+  ): Promise<UserResponseDto> {
+    const user = await this.usersService.findByClerkIdOrThrow(
+      clerkUser.sub || clerkUser.clerkId,
+    );
+    const updated = await this.usersService.completeDiscovery(user.id);
+    return this.usersService.toResponseDto(updated);
   }
 
   @Delete(':id')

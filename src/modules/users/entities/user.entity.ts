@@ -43,6 +43,26 @@ export class User {
   @Column({ name: 'has_completed_onboarding', default: false })
   hasCompletedOnboarding: boolean;
 
+  @Column({ name: 'is_learner', default: false })
+  isLearner: boolean;
+
+  @Column({ name: 'is_creator_intent', default: false })
+  isCreatorIntent: boolean;
+
+  @Column({ name: 'has_completed_discovery', default: false })
+  hasCompletedDiscovery: boolean;
+
+  @Column({ name: 'intent_selected_at', type: 'timestamptz', nullable: true })
+  intentSelectedAt?: Date;
+
+  @Column({
+    name: 'last_activity_context',
+    type: 'varchar',
+    length: 50,
+    nullable: true,
+  })
+  lastActivityContext?: string;
+
   @Column({ name: 'is_active', default: true })
   isActive: boolean;
 
