@@ -40,6 +40,7 @@ import { SessionSettingsResponseDto } from '../sessions/dto/session-settings.dto
 
 @ApiTags('Creators')
 @Controller('creators')
+@UseGuards(ClerkAuthGuard)
 export class CreatorsController {
   constructor(
     private readonly creatorsService: CreatorsService,
@@ -50,7 +51,6 @@ export class CreatorsController {
   ) {}
 
   @Get('me')
-  @UseGuards(ClerkAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get current user creator profile' })
   @ApiResponse({
@@ -58,17 +58,18 @@ export class CreatorsController {
     description: 'Creator profile retrieved',
     type: CreatorResponseDto,
   })
-  @ApiResponse({ status: 404, description: 'Creator profile not found' })
-  async getMyProfile(@CurrentUser() user: User): Promise<CreatorResponseDto> {
+  @ApiResponse({
+    status: 200,
+    description: 'No creator profile (returns null)',
+  })
+  async getMyProfile(
+    @CurrentUser() user: User,
+  ): Promise<CreatorResponseDto | null> {
     const creator = await this.creatorsService.findByUserId(user.id);
-    if (!creator) {
-      throw new NotFoundException('Creator profile not found');
-    }
-    return creator;
+    return creator || null;
   }
 
   @Get('me/following')
-  @UseGuards(ClerkAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get creators that current user is following' })
   @ApiQuery({ name: 'page', required: false })
@@ -82,7 +83,6 @@ export class CreatorsController {
   }
 
   @Get('me/stats')
-  @UseGuards(ClerkAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get current creator stats' })
   async getMyStats(@CurrentUser() user: User) {
@@ -94,7 +94,6 @@ export class CreatorsController {
   }
 
   @Delete('me/power')
-  @UseGuards(ClerkAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Disable creator power (remove creator role)' })
@@ -104,7 +103,6 @@ export class CreatorsController {
   }
 
   @Post()
-  @UseGuards(ClerkAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create creator profile (idempotent)' })
   @ApiResponse({
@@ -152,7 +150,6 @@ export class CreatorsController {
   }
 
   @Get(':id/is-following')
-  @UseGuards(ClerkAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Check if current user is following a creator' })
   @ApiResponse({ status: 200, description: 'Following status' })
@@ -312,7 +309,6 @@ export class CreatorsController {
   // ==================== FOLLOW ENDPOINTS ====================
 
   @Post(':id/follow')
-  @UseGuards(ClerkAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Follow a creator' })
@@ -326,7 +322,6 @@ export class CreatorsController {
   }
 
   @Delete(':id/follow')
-  @UseGuards(ClerkAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Unfollow a creator' })

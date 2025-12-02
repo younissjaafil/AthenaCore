@@ -35,6 +35,7 @@ import { Public } from '../../common/decorators/public.decorator';
 
 @ApiTags('Profiles')
 @Controller('profiles')
+@UseGuards(ClerkAuthGuard)
 export class ProfileController {
   constructor(private readonly profileService: ProfileService) {}
 
