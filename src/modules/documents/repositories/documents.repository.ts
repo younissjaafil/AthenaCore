@@ -92,29 +92,33 @@ export class DocumentsRepository {
   }
 
   async getStatsByAgent(agentId: string): Promise<{
-    total: number;
-    completed: number;
-    processing: number;
-    failed: number;
+    totalDocuments: number;
+    totalChunks: number;
+    totalEmbeddings: number;
     totalSize: number;
+    byStatus: Record<string, number>;
+    byType: Record<string, number>;
   }> {
     const documents = await this.repository.find({
       where: { agentId },
-      select: ['status', 'fileSize'],
+      select: ['status', 'fileSize', 'fileType', 'chunkCount', 'embeddingCount'],
+    });
+
+    const byStatus: Record<string, number> = {};
+    const byType: Record<string, number> = {};
+    
+    documents.forEach((doc) => {
+      byStatus[doc.status] = (byStatus[doc.status] || 0) + 1;
+      byType[doc.fileType] = (byType[doc.fileType] || 0) + 1;
     });
 
     return {
-      total: documents.length,
-      completed: documents.filter((d) => d.status === DocumentStatus.PROCESSED)
-        .length,
-      processing: documents.filter(
-        (d) =>
-          d.status === DocumentStatus.UPLOADED ||
-          d.status === DocumentStatus.PROCESSING,
-      ).length,
-      failed: documents.filter((d) => d.status === DocumentStatus.FAILED)
-        .length,
+      totalDocuments: documents.length,
+      totalChunks: documents.reduce((sum, d) => sum + (Number(d.chunkCount) || 0), 0),
+      totalEmbeddings: documents.reduce((sum, d) => sum + (Number(d.embeddingCount) || 0), 0),
       totalSize: documents.reduce((sum, d) => sum + Number(d.fileSize), 0),
+      byStatus,
+      byType,
     };
   }
 
