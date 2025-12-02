@@ -75,7 +75,7 @@ export class FeedController {
   @Post('posts')
   @UseGuards(ClerkAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Create a new post (creators only)' })
+  @ApiOperation({ summary: 'Create a new post' })
   @ApiResponse({ status: 201, type: PostResponseDto })
   async createPost(
     @CurrentUser() user: User,

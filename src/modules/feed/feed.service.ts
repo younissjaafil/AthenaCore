@@ -41,14 +41,14 @@ export class FeedService {
     userId: string,
     dto: CreatePostDto,
   ): Promise<PostResponseDto> {
-    // Get creator profile for user
+    // Get creator profile for user (if they have one)
     const creator = await this.creatorsService.findByUserId(userId);
-    if (!creator) {
-      throw new ForbiddenException('Only creators can create posts');
-    }
+    
+    // Allow all users to post, but use creatorId if they are a creator
+    const creatorId = creator?.id || null;
 
     // Create post
-    const post = await this.feedRepository.createPost(creator.id, {
+    const post = await this.feedRepository.createPost(creatorId, {
       title: dto.title,
       body: dto.body,
       visibility: dto.visibility || PostVisibility.PUBLIC,
