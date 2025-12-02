@@ -351,6 +351,7 @@ export class ProfileService {
       follows.map(async (f) => {
         const profile = await this.profileRepo.findOne({
           where: { userId: f.followerId },
+          relations: ['user'],
         });
         return profile ? this.enrichProfileResponse(profile, userId) : null;
       }),
@@ -381,6 +382,7 @@ export class ProfileService {
       follows.map(async (f) => {
         const profile = await this.profileRepo.findOne({
           where: { userId: f.followingId },
+          relations: ['user'],
         });
         return profile ? this.enrichProfileResponse(profile, userId) : null;
       }),
@@ -548,9 +550,10 @@ export class ProfileService {
       id: profile.id,
       userId: profile.userId,
       handle: profile.handle,
-      displayName: profile.displayName,
+      displayName: profile.displayName || profile.user?.firstName,
       bio: profile.bio,
-      avatarUrl: profile.avatarUrl,
+      // Fallback to user's profile image if profile avatar is not set
+      avatarUrl: profile.avatarUrl || profile.user?.profileImageUrl,
       bannerUrl: profile.bannerUrl,
       rankScore: 0, // Default value, actual rank comes from creator_profile
       websiteUrl: undefined,
