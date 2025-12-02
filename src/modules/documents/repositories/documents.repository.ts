@@ -101,12 +101,18 @@ export class DocumentsRepository {
   }> {
     const documents = await this.repository.find({
       where: { agentId },
-      select: ['status', 'fileSize', 'fileType', 'chunkCount', 'embeddingCount'],
+      select: [
+        'status',
+        'fileSize',
+        'fileType',
+        'chunkCount',
+        'embeddingCount',
+      ],
     });
 
     const byStatus: Record<string, number> = {};
     const byType: Record<string, number> = {};
-    
+
     documents.forEach((doc) => {
       byStatus[doc.status] = (byStatus[doc.status] || 0) + 1;
       byType[doc.fileType] = (byType[doc.fileType] || 0) + 1;
@@ -114,8 +120,14 @@ export class DocumentsRepository {
 
     return {
       totalDocuments: documents.length,
-      totalChunks: documents.reduce((sum, d) => sum + (Number(d.chunkCount) || 0), 0),
-      totalEmbeddings: documents.reduce((sum, d) => sum + (Number(d.embeddingCount) || 0), 0),
+      totalChunks: documents.reduce(
+        (sum, d) => sum + (Number(d.chunkCount) || 0),
+        0,
+      ),
+      totalEmbeddings: documents.reduce(
+        (sum, d) => sum + (Number(d.embeddingCount) || 0),
+        0,
+      ),
       totalSize: documents.reduce((sum, d) => sum + Number(d.fileSize), 0),
       byStatus,
       byType,

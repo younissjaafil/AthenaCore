@@ -441,12 +441,15 @@ export class PaymentsService {
       return;
     }
 
-    // Create entitlement (lifetime access for now)
+    // Create entitlement with 1-month expiry (monthly subscription)
+    const expiresAt = new Date();
+    expiresAt.setMonth(expiresAt.getMonth() + 1);
+
     await this.entitlementsRepository.create({
       userId,
       agentId,
       transactionId,
-      expiresAt: undefined, // Lifetime access
+      expiresAt,
       isActive: true,
     });
 
