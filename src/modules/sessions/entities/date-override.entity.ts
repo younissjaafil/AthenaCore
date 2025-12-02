@@ -4,11 +4,8 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
-  ManyToOne,
-  JoinColumn,
   Index,
 } from 'typeorm';
-import { Creator } from '../../creators/entities/creator.entity';
 
 @Entity('date_overrides')
 @Index(['creatorId', 'date'], { unique: true })
@@ -18,10 +15,6 @@ export class DateOverride {
 
   @Column({ type: 'uuid' })
   creatorId: string;
-
-  @ManyToOne(() => Creator)
-  @JoinColumn({ name: 'creatorId' })
-  creator: Creator;
 
   @Column({ type: 'date' })
   date: string;
