@@ -78,24 +78,43 @@ export class ClerkAuthGuard implements CanActivate {
       let user = await this.usersService.findByClerkId(clerkId);
 
       if (!user) {
-        // User doesn't exist, fetch details from Clerk API
-        console.log('User not found, fetching from Clerk API...');
-        const clerkUser = await this.clerkClient.users.getUser(clerkId);
-        console.log(
-          'Clerk user fetched:',
-          clerkUser.emailAddresses?.[0]?.emailAddress,
-        );
+        // User doesn't exist, try to fetch details from Clerk API
+        console.log('User not found in database, fetching from Clerk API...');
 
-        user = await this.usersService.findOrCreate({
-          sub: clerkId,
-          email:
-            clerkUser.emailAddresses?.[0]?.emailAddress ||
-            `${clerkId}@placeholder.com`,
-          username: clerkUser.username || undefined,
-          firstName: clerkUser.firstName || undefined,
-          lastName: clerkUser.lastName || undefined,
-          profileImageUrl: clerkUser.imageUrl || undefined,
-        });
+        try {
+          const clerkUser = await this.clerkClient.users.getUser(clerkId);
+          console.log(
+            'Clerk user fetched successfully:',
+            clerkUser.emailAddresses?.[0]?.emailAddress,
+          );
+
+          user = await this.usersService.findOrCreate({
+            sub: clerkId,
+            email:
+              clerkUser.emailAddresses?.[0]?.emailAddress ||
+              `${clerkId}@placeholder.com`,
+            username: clerkUser.username || undefined,
+            firstName: clerkUser.firstName || undefined,
+            lastName: clerkUser.lastName || undefined,
+            profileImageUrl: clerkUser.imageUrl || undefined,
+          });
+        } catch (clerkApiError: any) {
+          // If Clerk API fails, create user with minimal info from JWT token
+          console.error(
+            'Failed to fetch from Clerk API:',
+            clerkApiError.message,
+          );
+          console.log('Creating user with minimal data from JWT token...');
+
+          user = await this.usersService.findOrCreate({
+            sub: clerkId,
+            email: (payload as any).email || `${clerkId}@placeholder.com`,
+            username: undefined,
+            firstName: undefined,
+            lastName: undefined,
+            profileImageUrl: undefined,
+          });
+        }
       }
 
       console.log('User loaded:', user.id);
