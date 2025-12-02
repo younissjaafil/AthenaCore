@@ -43,7 +43,7 @@ export class FeedService {
   ): Promise<PostResponseDto> {
     // Get creator profile for user (if they have one)
     const creator = await this.creatorsService.findByUserId(userId);
-    
+
     // Allow all users to post, but use creatorId if they are a creator
     const creatorId = creator?.id || null;
 
