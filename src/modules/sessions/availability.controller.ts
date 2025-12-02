@@ -206,4 +206,23 @@ export class AvailabilityController {
       await this.availabilityService.getCreatorIdFromUserId(userId);
     return this.availabilityService.getDateOverrides(creatorId);
   }
+
+  @Get('overrides/:creatorId')
+  @Public()
+  @ApiOperation({ summary: 'Get creator date overrides (public)' })
+  @ApiParam({
+    name: 'creatorId',
+    description: 'Creator profile ID',
+    example: 'cc3f5b61-b02e-492d-bc48-06ff3e06d800',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Date overrides retrieved',
+    type: [DateOverrideResponseDto],
+  })
+  async getCreatorDateOverrides(
+    @Param('creatorId') creatorId: string,
+  ): Promise<DateOverrideResponseDto[]> {
+    return this.availabilityService.getDateOverrides(creatorId);
+  }
 }
