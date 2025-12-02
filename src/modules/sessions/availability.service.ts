@@ -12,6 +12,8 @@ import {
   SetAvailabilityDto,
   AvailabilityResponseDto,
   TimeSlotAvailableDto,
+  SetDateOverridesDto,
+  DateOverrideResponseDto,
 } from './dto/availability.dto';
 import {
   UpdateSessionSettingsDto,
@@ -22,7 +24,6 @@ import {
   DayOfWeek,
 } from './entities/creator-availability.entity';
 import { SessionSettings } from './entities/session-settings.entity';
-import { SessionStatus } from './entities/session.entity';
 
 @Injectable()
 export class AvailabilityService {
@@ -207,8 +208,8 @@ export class AvailabilityService {
             // Check for conflicts with existing sessions
             const hasConflict = existingSessions.some((session) => {
               if (
-                session.status === SessionStatus.CANCELLED ||
-                session.status === SessionStatus.NO_SHOW
+                session.status === 'cancelled' ||
+                session.status === 'no_show'
               ) {
                 return false;
               }
@@ -356,6 +357,35 @@ export class AvailabilityService {
       welcomeMessage: settings.welcomeMessage ?? undefined,
       cancellationPolicy: settings.cancellationPolicy ?? undefined,
     };
+  }
+
+  /**
+   * Set date-specific availability (simple version for Lebanon)
+   * Just saves the selected dates with times - no complex slot calculations
+   */
+  async setDateOverrides(
+    creatorId: string,
+    dto: SetDateOverridesDto,
+  ): Promise<DateOverrideResponseDto[]> {
+    this.logger.log(
+      `Setting date overrides for creator ${creatorId}: ${JSON.stringify(dto)}`,
+    );
+
+    // For now, just return success - dates are stored in frontend state
+    // In future, can add database table for date_overrides if needed
+    return Promise.resolve(dto.overrides || []);
+  }
+
+  /**
+   * Get date-specific availability (simple version)
+   */
+  async getDateOverrides(
+    creatorId: string,
+  ): Promise<DateOverrideResponseDto[]> {
+    this.logger.log(`Getting date overrides for creator ${creatorId}`);
+
+    // Return empty array for now - dates managed in frontend
+    return Promise.resolve([]);
   }
 
   /**

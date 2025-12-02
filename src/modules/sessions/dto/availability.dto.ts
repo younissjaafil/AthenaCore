@@ -139,3 +139,55 @@ export class TimeSlotAvailableDto {
   })
   timezone?: string;
 }
+
+// Date Override DTOs (simple version for Lebanon)
+export class DateOverrideDto {
+  @ApiProperty({
+    description: 'Date in YYYY-MM-DD format',
+    example: '2025-12-02',
+  })
+  @IsString()
+  date: string;
+
+  @ApiProperty({
+    description: 'Start time in HH:MM format',
+    example: '10:00',
+  })
+  @IsString()
+  @Matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, {
+    message: 'startTime must be in HH:MM format',
+  })
+  startTime: string;
+
+  @ApiProperty({
+    description: 'End time in HH:MM format',
+    example: '11:30',
+  })
+  @IsString()
+  @Matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, {
+    message: 'endTime must be in HH:MM format',
+  })
+  endTime: string;
+}
+
+export class SetDateOverridesDto {
+  @ApiProperty({
+    description: 'Array of date-specific availability overrides',
+    type: [DateOverrideDto],
+  })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => DateOverrideDto)
+  overrides: DateOverrideDto[];
+}
+
+export class DateOverrideResponseDto {
+  @ApiProperty()
+  date: string;
+
+  @ApiProperty()
+  startTime: string;
+
+  @ApiProperty()
+  endTime: string;
+}
