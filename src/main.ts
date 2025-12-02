@@ -5,7 +5,7 @@ import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
-// Database schema updated - date_overrides FK constraint fixed
+// Updated: date_overrides FK constraint fixed - Dec 3, 2025
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
