@@ -8,6 +8,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { FeedRepository } from './repositories/feed.repository';
 import { CreatorsService } from '../creators/creators.service';
+import { CreateCreatorDto } from '../creators/dto/create-creator.dto';
+import { CreatorResponseDto } from '../creators/dto/creator-response.dto';
 import { CreatorFollowService } from '../creators/creator-follow.service';
 import {
   CreatePostDto,
@@ -41,14 +43,10 @@ export class FeedService {
     userId: string,
     dto: CreatePostDto,
   ): Promise<PostResponseDto> {
-    // Get creator profile for user (if they have one)
-    const creator = await this.creatorsService.findByUserId(userId);
-
-    // Allow all users to post, but use creatorId if they are a creator
-    const creatorId = creator?.id || null;
+    const creator = await this.ensureCreatorProfile(userId);
 
     // Create post
-    const post = await this.feedRepository.createPost(creatorId, {
+    const post = await this.feedRepository.createPost(creator.id, {
       title: dto.title,
       body: dto.body,
       visibility: dto.visibility || PostVisibility.PUBLIC,
@@ -65,9 +63,7 @@ export class FeedService {
       throw new NotFoundException('Post creation failed');
     }
 
-    this.logger.log(
-      `Created post ${post.id} for user ${userId}${creator ? ` (creator ${creator.id})` : ' (non-creator)'}`,
-    );
+    this.logger.log(`Created post ${post.id} for creator ${creator.id}`);
 
     // Get profile data
     const profile = await this.profileRepo.findOne({
@@ -522,43 +518,51 @@ export class FeedService {
         thumbnailUrl: m.thumbnailUrl,
         sortOrder: m.sortOrder,
       })),
-      creator: post.creator
-        ? {
-            id: post.creator.id,
-            userId: post.creator.userId,
-            title: post.creator.title,
-            bio: post.creator.bio,
-            user: {
-              id: post.creator.user.id,
-              firstName: post.creator.user.firstName,
-              lastName: post.creator.user.lastName,
-              profileImageUrl: post.creator.user.profileImageUrl,
-            },
-            profile: profile
-              ? {
-                  handle: profile.handle,
-                  displayName: profile.displayName,
-                  avatarUrl: profile.avatarUrl,
-                }
-              : undefined,
-          }
-        : undefined,
+      creator: {
+        id: post.creator.id,
+        userId: post.creator.userId,
+        title: post.creator.title,
+        bio: post.creator.bio,
+        user: {
+          id: post.creator.user.id,
+          firstName: post.creator.user.firstName,
+          lastName: post.creator.user.lastName,
+          profileImageUrl: post.creator.user.profileImageUrl,
+        },
+        profile: profile
+          ? {
+              handle: profile.handle,
+              displayName: profile.displayName,
+              avatarUrl: profile.avatarUrl,
+            }
+          : undefined,
+      },
       isLiked,
       createdAt: post.createdAt,
       updatedAt: post.updatedAt,
     };
   }
 
+  private async ensureCreatorProfile(
+    userId: string,
+  ): Promise<CreatorResponseDto> {
+    const existing = await this.creatorsService.findByUserId(userId);
+    if (existing) {
+      return existing;
+    }
+
+    const defaultCreator: CreateCreatorDto = {
+      title: 'Community Creator',
+      bio: 'Auto-created when posting for the first time.',
+    };
+
+    return this.creatorsService.create(userId, defaultCreator);
+  }
+
   private async getProfilesForPosts(
     posts: Post[],
   ): Promise<Map<string, UserProfile>> {
-    const userIds = [
-      ...new Set(
-        posts
-          .filter((p) => p.creator !== null)
-          .map((p) => p.creator!.userId),
-      ),
-    ];
+    const userIds = [...new Set(posts.map((p) => p.creator.userId))];
     if (userIds.length === 0) return new Map();
 
     const profiles = await this.profileRepo.find({

@@ -26,12 +26,12 @@ export class Post {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ name: 'creator_id', type: 'uuid', nullable: true })
-  creatorId: string | null;
+  @Column({ name: 'creator_id', type: 'uuid' })
+  creatorId: string;
 
-  @ManyToOne(() => Creator, { onDelete: 'CASCADE', nullable: true })
+  @ManyToOne(() => Creator, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'creator_id' })
-  creator: Creator | null;
+  creator: Creator;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
   title?: string;
