@@ -24,7 +24,10 @@ export class FeedRepository {
 
   // ==================== POSTS ====================
 
-  async createPost(creatorId: string | null, data: Partial<Post>): Promise<Post> {
+  async createPost(
+    creatorId: string | null,
+    data: Partial<Post>,
+  ): Promise<Post> {
     const post = this.postRepository.create({
       ...data,
       creatorId,

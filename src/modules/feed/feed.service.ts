@@ -65,7 +65,9 @@ export class FeedService {
       throw new NotFoundException('Post creation failed');
     }
 
-    this.logger.log(`Created post ${post.id} for user ${userId}${creator ? ` (creator ${creator.id})` : ' (non-creator)'}`);
+    this.logger.log(
+      `Created post ${post.id} for user ${userId}${creator ? ` (creator ${creator.id})` : ' (non-creator)'}`,
+    );
 
     // Get profile data
     const profile = await this.profileRepo.findOne({
@@ -137,12 +139,16 @@ export class FeedService {
       ? await this.feedRepository.hasUserLikedPost(postId, userId)
       : false;
 
-    // Get profile data
-    const profile = await this.profileRepo.findOne({
-      where: { userId: post.creator.userId },
-    });
+    // Get profile data if post has a creator
+    let profile: UserProfile | undefined;
+    if (post.creator) {
+      const foundProfile = await this.profileRepo.findOne({
+        where: { userId: post.creator.userId },
+      });
+      profile = foundProfile || undefined;
+    }
 
-    return this.mapPostToResponse(post, isLiked, profile || undefined);
+    return this.mapPostToResponse(post, isLiked, profile);
   }
 
   async getCreatorPosts(
@@ -225,12 +231,14 @@ export class FeedService {
     // Get profile data for posts
     const profileMap = await this.getProfilesForPosts(posts);
 
+    const postsWithCreators = posts.filter((post) => post.creator !== null);
+
     return {
-      posts: posts.map((post) =>
+      posts: postsWithCreators.map((post) =>
         this.mapPostToResponse(
           post,
           likedPostIds.includes(post.id),
-          profileMap.get(post.creator.userId),
+          profileMap.get(post.creator!.userId),
         ),
       ),
       total,
@@ -271,12 +279,14 @@ export class FeedService {
     // Get profile data for posts
     const profileMap = await this.getProfilesForPosts(posts);
 
+    const postsWithCreators = posts.filter((post) => post.creator !== null);
+
     return {
-      posts: posts.map((post) =>
+      posts: postsWithCreators.map((post) =>
         this.mapPostToResponse(
           post,
           likedPostIds.includes(post.id),
-          profileMap.get(post.creator.userId),
+          profileMap.get(post.creator!.userId),
         ),
       ),
       total,
@@ -466,6 +476,9 @@ export class FeedService {
     }
 
     if (post.visibility === PostVisibility.FOLLOWERS) {
+      if (!post.creatorId) {
+        throw new ForbiddenException('Post not accessible');
+      }
       const isFollowing = await this.followService.isFollowing(
         userId,
         post.creatorId,
@@ -509,25 +522,27 @@ export class FeedService {
         thumbnailUrl: m.thumbnailUrl,
         sortOrder: m.sortOrder,
       })),
-      creator: {
-        id: post.creator.id,
-        userId: post.creator.userId,
-        title: post.creator.title,
-        bio: post.creator.bio,
-        user: {
-          id: post.creator.user.id,
-          firstName: post.creator.user.firstName,
-          lastName: post.creator.user.lastName,
-          profileImageUrl: post.creator.user.profileImageUrl,
-        },
-        profile: profile
-          ? {
-              handle: profile.handle,
-              displayName: profile.displayName,
-              avatarUrl: profile.avatarUrl,
-            }
-          : undefined,
-      },
+      creator: post.creator
+        ? {
+            id: post.creator.id,
+            userId: post.creator.userId,
+            title: post.creator.title,
+            bio: post.creator.bio,
+            user: {
+              id: post.creator.user.id,
+              firstName: post.creator.user.firstName,
+              lastName: post.creator.user.lastName,
+              profileImageUrl: post.creator.user.profileImageUrl,
+            },
+            profile: profile
+              ? {
+                  handle: profile.handle,
+                  displayName: profile.displayName,
+                  avatarUrl: profile.avatarUrl,
+                }
+              : undefined,
+          }
+        : undefined,
       isLiked,
       createdAt: post.createdAt,
       updatedAt: post.updatedAt,
@@ -537,7 +552,13 @@ export class FeedService {
   private async getProfilesForPosts(
     posts: Post[],
   ): Promise<Map<string, UserProfile>> {
-    const userIds = [...new Set(posts.map((p) => p.creator.userId))];
+    const userIds = [
+      ...new Set(
+        posts
+          .filter((p) => p.creator !== null)
+          .map((p) => p.creator!.userId),
+      ),
+    ];
     if (userIds.length === 0) return new Map();
 
     const profiles = await this.profileRepo.find({

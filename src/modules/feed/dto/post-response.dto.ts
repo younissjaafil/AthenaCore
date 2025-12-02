@@ -70,8 +70,8 @@ export class PostResponseDto {
   @ApiProperty()
   id: string;
 
-  @ApiProperty()
-  creatorId: string;
+  @ApiPropertyOptional()
+  creatorId: string | null;
 
   @ApiPropertyOptional()
   title?: string;
@@ -97,8 +97,8 @@ export class PostResponseDto {
   @ApiProperty({ type: [PostMediaResponseDto] })
   media: PostMediaResponseDto[];
 
-  @ApiProperty()
-  creator: PostCreatorResponseDto;
+  @ApiPropertyOptional({ type: PostCreatorResponseDto })
+  creator?: PostCreatorResponseDto;
 
   @ApiProperty()
   isLiked: boolean;
