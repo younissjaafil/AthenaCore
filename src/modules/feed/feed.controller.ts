@@ -10,6 +10,8 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  ParseIntPipe,
+  DefaultValuePipe,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -50,8 +52,8 @@ export class FeedController {
   @ApiResponse({ status: 200, type: FeedResponseDto })
   async getHomeFeed(
     @CurrentUser() user: User,
-    @Query('page') page: number = 1,
-    @Query('limit') limit: number = 20,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
   ): Promise<FeedResponseDto> {
     return this.feedService.getHomeFeed(user.id, page, limit);
   }
@@ -64,8 +66,8 @@ export class FeedController {
   @ApiResponse({ status: 200, type: FeedResponseDto })
   async getDiscoverFeed(
     @CurrentUser() user: User | null,
-    @Query('page') page: number = 1,
-    @Query('limit') limit: number = 20,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
   ): Promise<FeedResponseDto> {
     return this.feedService.getDiscoverFeed(page, limit, user?.id);
   }
@@ -165,8 +167,8 @@ export class FeedController {
   async getPostComments(
     @Param('id') postId: string,
     @CurrentUser() user: User | null,
-    @Query('page') page: number = 1,
-    @Query('limit') limit: number = 20,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
     @Query('parentId') parentId?: string,
   ): Promise<CommentsResponseDto> {
     return this.feedService.getPostComments(
@@ -260,8 +262,8 @@ export class CreatorPostsController {
   async getCreatorPosts(
     @Param('id') creatorId: string,
     @CurrentUser() user: User | null,
-    @Query('page') page: number = 1,
-    @Query('limit') limit: number = 20,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
   ): Promise<FeedResponseDto> {
     return this.feedService.getCreatorPosts(creatorId, page, limit, user?.id);
   }

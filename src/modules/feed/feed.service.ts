@@ -227,20 +227,22 @@ export class FeedService {
     // Get profile data for posts
     const profileMap = await this.getProfilesForPosts(posts);
 
+    // Filter out posts with null creators (defensive)
     const postsWithCreators = posts.filter((post) => post.creator !== null);
+    const filteredTotal = total - (posts.length - postsWithCreators.length);
 
     return {
       posts: postsWithCreators.map((post) =>
         this.mapPostToResponse(
           post,
           likedPostIds.includes(post.id),
-          profileMap.get(post.creator!.userId),
+          profileMap.get(post.creator.userId),
         ),
       ),
-      total,
+      total: filteredTotal,
       page,
       limit,
-      hasMore: page * limit < total,
+      hasMore: page * limit < filteredTotal,
     };
   }
 
@@ -275,20 +277,22 @@ export class FeedService {
     // Get profile data for posts
     const profileMap = await this.getProfilesForPosts(posts);
 
+    // Filter out posts with null creators (defensive)
     const postsWithCreators = posts.filter((post) => post.creator !== null);
+    const filteredTotal = total - (posts.length - postsWithCreators.length);
 
     return {
       posts: postsWithCreators.map((post) =>
         this.mapPostToResponse(
           post,
           likedPostIds.includes(post.id),
-          profileMap.get(post.creator!.userId),
+          profileMap.get(post.creator.userId),
         ),
       ),
-      total,
+      total: filteredTotal,
       page,
       limit,
-      hasMore: page * limit < total,
+      hasMore: page * limit < filteredTotal,
     };
   }
 

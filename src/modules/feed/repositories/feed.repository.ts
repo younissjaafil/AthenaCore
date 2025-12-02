@@ -175,7 +175,10 @@ export class FeedRepository {
   async likePost(postId: string, userId: string): Promise<PostLike | null> {
     try {
       const like = this.postLikeRepository.create({ postId, userId });
-      return await this.postLikeRepository.save(like);
+      const saved = await this.postLikeRepository.save(like);
+      // Increment like count on post
+      await this.postRepository.increment({ id: postId }, 'likesCount', 1);
+      return saved;
     } catch {
       // Unique constraint violation - already liked
       return null;
@@ -184,7 +187,12 @@ export class FeedRepository {
 
   async unlikePost(postId: string, userId: string): Promise<boolean> {
     const result = await this.postLikeRepository.delete({ postId, userId });
-    return (result.affected ?? 0) > 0;
+    const wasDeleted = (result.affected ?? 0) > 0;
+    // Decrement like count if successfully deleted
+    if (wasDeleted) {
+      await this.postRepository.decrement({ id: postId }, 'likesCount', 1);
+    }
+    return wasDeleted;
   }
 
   async hasUserLikedPost(postId: string, userId: string): Promise<boolean> {
@@ -221,7 +229,12 @@ export class FeedRepository {
       content,
       parentId,
     });
-    return this.commentRepository.save(comment);
+    const saved = await this.commentRepository.save(comment);
+    // Increment comment count on post (only for top-level comments)
+    if (!parentId) {
+      await this.postRepository.increment({ id: postId }, 'commentsCount', 1);
+    }
+    return saved;
   }
 
   async findCommentById(id: string): Promise<PostComment | null> {
@@ -240,6 +253,16 @@ export class FeedRepository {
   }
 
   async deleteComment(id: string): Promise<void> {
+    // Get the comment first to know if it's a top-level comment
+    const comment = await this.findCommentById(id);
+    if (comment && !comment.parentId) {
+      // Decrement comment count on post (only for top-level comments)
+      await this.postRepository.decrement(
+        { id: comment.postId },
+        'commentsCount',
+        1,
+      );
+    }
     await this.commentRepository.delete(id);
   }
 
@@ -280,7 +303,14 @@ export class FeedRepository {
   ): Promise<CommentLike | null> {
     try {
       const like = this.commentLikeRepository.create({ commentId, userId });
-      return await this.commentLikeRepository.save(like);
+      const saved = await this.commentLikeRepository.save(like);
+      // Increment like count on comment
+      await this.commentRepository.increment(
+        { id: commentId },
+        'likesCount',
+        1,
+      );
+      return saved;
     } catch {
       return null;
     }
@@ -291,7 +321,16 @@ export class FeedRepository {
       commentId,
       userId,
     });
-    return (result.affected ?? 0) > 0;
+    const wasDeleted = (result.affected ?? 0) > 0;
+    // Decrement like count if successfully deleted
+    if (wasDeleted) {
+      await this.commentRepository.decrement(
+        { id: commentId },
+        'likesCount',
+        1,
+      );
+    }
+    return wasDeleted;
   }
 
   async getUserLikedCommentIds(
