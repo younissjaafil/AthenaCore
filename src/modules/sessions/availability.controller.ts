@@ -21,6 +21,8 @@ import {
   SetAvailabilityDto,
   AvailabilityResponseDto,
   TimeSlotAvailableDto,
+  SetDateOverridesDto,
+  DateOverrideResponseDto,
 } from './dto/availability.dto';
 import {
   UpdateSessionSettingsDto,
@@ -164,5 +166,44 @@ export class AvailabilityController {
     const creatorId =
       await this.availabilityService.getCreatorIdFromUserId(userId);
     return this.availabilityService.updateSessionSettings(creatorId, dto);
+  }
+
+  // Date Overrides (Simple version for Lebanon)
+  @Post('overrides')
+  @UseGuards(ClerkAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Set date-specific availability',
+    description: 'Simple date overrides for Lebanon timezone',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Date overrides saved',
+    type: [DateOverrideResponseDto],
+  })
+  async setDateOverrides(
+    @CurrentUser('sub') userId: string,
+    @Body() dto: SetDateOverridesDto,
+  ): Promise<DateOverrideResponseDto[]> {
+    const creatorId =
+      await this.availabilityService.getCreatorIdFromUserId(userId);
+    return this.availabilityService.setDateOverrides(creatorId, dto);
+  }
+
+  @Get('overrides')
+  @UseGuards(ClerkAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get my date overrides' })
+  @ApiResponse({
+    status: 200,
+    description: 'Date overrides retrieved',
+    type: [DateOverrideResponseDto],
+  })
+  async getMyDateOverrides(
+    @CurrentUser('sub') userId: string,
+  ): Promise<DateOverrideResponseDto[]> {
+    const creatorId =
+      await this.availabilityService.getCreatorIdFromUserId(userId);
+    return this.availabilityService.getDateOverrides(creatorId);
   }
 }
