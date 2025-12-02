@@ -6,6 +6,7 @@ import {
   DayOfWeek,
 } from '../entities/creator-availability.entity';
 import { SessionSettings } from '../entities/session-settings.entity';
+import { DateOverride } from '../entities/date-override.entity';
 
 @Injectable()
 export class AvailabilityRepository {
@@ -14,6 +15,8 @@ export class AvailabilityRepository {
     private readonly availabilityRepo: Repository<CreatorAvailability>,
     @InjectRepository(SessionSettings)
     private readonly settingsRepo: Repository<SessionSettings>,
+    @InjectRepository(DateOverride)
+    private readonly dateOverrideRepo: Repository<DateOverride>,
   ) {}
 
   // Availability methods
@@ -103,5 +106,51 @@ export class AvailabilityRepository {
       settings = await this.createSettings({ creatorId });
     }
     return settings;
+  }
+
+  // Date Override methods
+  async findDateOverridesByCreator(creatorId: string): Promise<DateOverride[]> {
+    return this.dateOverrideRepo.find({
+      where: { creatorId },
+      order: { date: 'ASC' },
+    });
+  }
+
+  async findDateOverride(
+    creatorId: string,
+    date: string,
+  ): Promise<DateOverride | null> {
+    return this.dateOverrideRepo.findOne({
+      where: { creatorId, date },
+    });
+  }
+
+  async createDateOverride(
+    data: Partial<DateOverride>,
+  ): Promise<DateOverride> {
+    const override = this.dateOverrideRepo.create(data);
+    return this.dateOverrideRepo.save(override);
+  }
+
+  async upsertDateOverride(
+    creatorId: string,
+    date: string,
+    data: Partial<DateOverride>,
+  ): Promise<DateOverride> {
+    const existing = await this.findDateOverride(creatorId, date);
+    if (existing) {
+      await this.dateOverrideRepo.update(existing.id, data);
+      return (await this.findDateOverride(creatorId, date))!;
+    } else {
+      return this.createDateOverride({ creatorId, date, ...data });
+    }
+  }
+
+  async deleteAllDateOverrides(creatorId: string): Promise<void> {
+    await this.dateOverrideRepo.delete({ creatorId });
+  }
+
+  async deleteDateOverride(creatorId: string, date: string): Promise<void> {
+    await this.dateOverrideRepo.delete({ creatorId, date });
   }
 }

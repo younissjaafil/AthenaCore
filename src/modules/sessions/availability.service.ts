@@ -371,9 +371,31 @@ export class AvailabilityService {
       `Setting date overrides for creator ${creatorId}: ${JSON.stringify(dto)}`,
     );
 
-    // For now, just return success - dates are stored in frontend state
-    // In future, can add database table for date_overrides if needed
-    return Promise.resolve(dto.overrides || []);
+    // Save each date override to the database
+    const savedOverrides: DateOverrideResponseDto[] = [];
+    for (const override of dto.overrides) {
+      const saved = await this.availabilityRepository.upsertDateOverride(
+        creatorId,
+        override.date,
+        {
+          startTime: override.startTime || null,
+          endTime: override.endTime || null,
+          isAvailable: override.isAvailable,
+        },
+      );
+      savedOverrides.push({
+        date: saved.date,
+        startTime: saved.startTime || undefined,
+        endTime: saved.endTime || undefined,
+        isAvailable: saved.isAvailable,
+      });
+    }
+
+    this.logger.log(
+      `Saved ${savedOverrides.length} date overrides for creator ${creatorId}`,
+    );
+
+    return savedOverrides;
   }
 
   /**
@@ -384,8 +406,15 @@ export class AvailabilityService {
   ): Promise<DateOverrideResponseDto[]> {
     this.logger.log(`Getting date overrides for creator ${creatorId}`);
 
-    // Return empty array for now - dates managed in frontend
-    return Promise.resolve([]);
+    const overrides =
+      await this.availabilityRepository.findDateOverridesByCreator(creatorId);
+
+    return overrides.map((o) => ({
+      date: o.date,
+      startTime: o.startTime || undefined,
+      endTime: o.endTime || undefined,
+      isAvailable: o.isAvailable,
+    }));
   }
 
   /**
