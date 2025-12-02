@@ -65,7 +65,7 @@ export class FeedService {
       throw new NotFoundException('Post creation failed');
     }
 
-    this.logger.log(`Created post ${post.id} for creator ${creator.id}`);
+    this.logger.log(`Created post ${post.id} for user ${userId}${creator ? ` (creator ${creator.id})` : ' (non-creator)'}`);
 
     // Get profile data
     const profile = await this.profileRepo.findOne({
