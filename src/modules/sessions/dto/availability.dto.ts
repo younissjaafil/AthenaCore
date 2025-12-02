@@ -152,22 +152,33 @@ export class DateOverrideDto {
   @ApiProperty({
     description: 'Start time in HH:MM format',
     example: '10:00',
+    required: false,
   })
+  @IsOptional()
   @IsString()
   @Matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, {
     message: 'startTime must be in HH:MM format',
   })
-  startTime: string;
+  startTime?: string;
 
   @ApiProperty({
     description: 'End time in HH:MM format',
     example: '11:30',
+    required: false,
   })
+  @IsOptional()
   @IsString()
   @Matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, {
     message: 'endTime must be in HH:MM format',
   })
-  endTime: string;
+  endTime?: string;
+
+  @ApiProperty({
+    description: 'Whether this date is available (true) or blocked (false)',
+    example: true,
+  })
+  @IsBoolean()
+  isAvailable: boolean;
 }
 
 export class SetDateOverridesDto {
@@ -185,9 +196,12 @@ export class DateOverrideResponseDto {
   @ApiProperty()
   date: string;
 
-  @ApiProperty()
-  startTime: string;
+  @ApiProperty({ required: false })
+  startTime?: string;
+
+  @ApiProperty({ required: false })
+  endTime?: string;
 
   @ApiProperty()
-  endTime: string;
+  isAvailable: boolean;
 }
