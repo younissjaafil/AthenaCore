@@ -125,9 +125,7 @@ export class AvailabilityRepository {
     });
   }
 
-  async createDateOverride(
-    data: Partial<DateOverride>,
-  ): Promise<DateOverride> {
+  async createDateOverride(data: Partial<DateOverride>): Promise<DateOverride> {
     const override = this.dateOverrideRepo.create(data);
     return this.dateOverrideRepo.save(override);
   }
