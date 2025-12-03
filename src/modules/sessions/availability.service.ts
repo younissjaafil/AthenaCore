@@ -99,9 +99,18 @@ export class AvailabilityService {
    * Get creator's availability
    */
   async getAvailability(creatorId: string): Promise<AvailabilityResponseDto[]> {
-    const availabilities =
-      await this.availabilityRepository.findByCreator(creatorId);
-    return availabilities.map((a) => this.mapAvailabilityToDto(a));
+    try {
+      const availabilities =
+        await this.availabilityRepository.findByCreator(creatorId);
+      return availabilities.map((a) => this.mapAvailabilityToDto(a));
+    } catch (error) {
+      this.logger.error(
+        `Error fetching availability for creator ${creatorId}:`,
+        error,
+      );
+      // Return empty array instead of throwing - creator might not have set availability yet
+      return [];
+    }
   }
 
   /**

@@ -316,4 +316,23 @@ export class DocumentsController {
     // User ID is used as creator ID to verify ownership via agent
     await this.documentsService.deleteDocument(id, user.id);
   }
+
+  @Post(':id/reprocess')
+  @UseGuards(ClerkAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Reprocess document to extract text and generate embeddings',
+  })
+  @ApiParam({ name: 'id', description: 'Document ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Document queued for reprocessing',
+    type: DocumentResponseDto,
+  })
+  async reprocessDocument(
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+  ): Promise<DocumentResponseDto> {
+    return this.documentsService.reprocessDocument(id, user.id);
+  }
 }

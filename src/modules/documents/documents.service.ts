@@ -471,6 +471,44 @@ export class DocumentsService {
     return this.toResponseDto(updatedDocument!);
   }
 
+  /**
+   * Reprocess an existing document to re-extract text and regenerate embeddings
+   * Useful for fixing documents that failed processing or were uploaded before fixes
+   */
+  async reprocessDocument(
+    id: string,
+    userId: string,
+  ): Promise<DocumentResponseDto> {
+    const document = await this.documentsRepository.findById(id);
+    if (!document) {
+      throw new NotFoundException('Document not found');
+    }
+
+    // Verify ownership
+    if (document.ownerType === DocumentOwnerType.AGENT && document.agentId) {
+      const agent = await this.agentsRepository.findById(document.agentId);
+      if (!agent) {
+        throw new NotFoundException('Agent not found');
+      }
+      if (!agent.creator || agent.creator.userId !== userId) {
+        throw new ForbiddenException(
+          'You can only reprocess documents from your own agents',
+        );
+      }
+    }
+
+    // Mark as processing
+    await this.documentsRepository.updateStatus(id, DocumentStatus.PROCESSING);
+
+    // Process document synchronously (extract text + embeddings)
+    this.logger.log(`Reprocessing document ${id}...`);
+    await this.processDocumentAsync(id);
+
+    // Return the updated document
+    const updatedDocument = await this.documentsRepository.findById(id);
+    return this.toResponseDto(updatedDocument!);
+  }
+
   // ===== OWNER-BASED QUERIES (NEW) =====
 
   async findByOwner(
