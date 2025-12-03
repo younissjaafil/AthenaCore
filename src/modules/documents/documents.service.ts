@@ -184,7 +184,7 @@ export class DocumentsService {
       agentId: uploadDto.agentId,
       forRag: true,
       forProfile: false,
-      visibility: DocumentVisibility.PRIVATE,
+      visibility: uploadDto.visibility ?? DocumentVisibility.PRIVATE,
       pricingType: DocumentPricingType.FREE,
       title: uploadDto.title,
       description: uploadDto.description,

@@ -136,6 +136,15 @@ export class UploadDocumentDto {
   description?: string;
 
   @ApiPropertyOptional({
+    enum: DocumentVisibility,
+    description: 'Who can see this document',
+    default: DocumentVisibility.PRIVATE,
+  })
+  @IsEnum(DocumentVisibility)
+  @IsOptional()
+  visibility?: DocumentVisibility;
+
+  @ApiPropertyOptional({
     description: 'Additional metadata',
   })
   @IsObject()
