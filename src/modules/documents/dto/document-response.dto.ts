@@ -111,6 +111,9 @@ export class PublicDocumentResponseDto {
   @ApiProperty()
   fileSize: number;
 
+  @ApiPropertyOptional()
+  s3Url?: string;
+
   @ApiProperty({ enum: DocumentKind })
   kind: DocumentKind;
 
@@ -131,6 +134,12 @@ export class PublicDocumentResponseDto {
 
   @ApiPropertyOptional()
   description?: string;
+
+  @ApiPropertyOptional()
+  status?: string;
+
+  @ApiPropertyOptional()
+  chunkCount?: number;
 
   @ApiProperty()
   createdAt: Date;

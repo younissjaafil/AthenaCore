@@ -492,10 +492,10 @@ export class DocumentsService {
 
   async findPublicProfileDocs(
     creatorId: string,
-  ): Promise<DocumentResponseDto[]> {
+  ): Promise<PublicDocumentResponseDto[]> {
     const documents =
       await this.documentsRepository.findPublicProfileDocs(creatorId);
-    return documents.map((doc) => this.toResponseDto(doc));
+    return documents.map((doc) => this.toPublicResponseDto(doc));
   }
 
   async getAgentStats(agentId: string) {
@@ -545,6 +545,7 @@ export class DocumentsService {
       filename: document.filename,
       fileType: document.fileType,
       fileSize: Number(document.fileSize),
+      s3Url: document.s3Url,
       kind: document.kind,
       visibility: document.visibility,
       pricingType: document.pricingType,
@@ -552,6 +553,8 @@ export class DocumentsService {
       currency: document.currency,
       title: metadata?.title,
       description: metadata?.description,
+      status: document.status,
+      chunkCount: document.chunkCount,
       createdAt: document.createdAt,
     };
   }
