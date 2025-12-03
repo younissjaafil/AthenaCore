@@ -179,7 +179,7 @@ export class S3Service {
   }
 
   /**
-   * Get file extension from MIME type
+   * Get file extension from MIME types
    */
   private getExtensionFromMimeType(mimeType: string): string {
     const mimeToExt: Record<string, string> = {
