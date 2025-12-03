@@ -3,6 +3,7 @@ import {
   Post,
   Get,
   Delete,
+  Patch,
   Param,
   Body,
   UseInterceptors,
@@ -27,6 +28,7 @@ import { CreatorsService } from '../creators/creators.service';
 import {
   UploadDocumentDto,
   UnifiedUploadDocumentDto,
+  UpdateDocumentDto,
 } from './dto/upload-document.dto';
 import {
   DocumentResponseDto,
@@ -279,6 +281,26 @@ export class DocumentsController {
   })
   async getDocument(@Param('id') id: string): Promise<DocumentResponseDto> {
     return this.documentsService.findOne(id);
+  }
+
+  @Patch(':id')
+  @UseGuards(ClerkAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Update document properties (visibility, title, etc)',
+  })
+  @ApiParam({ name: 'id', description: 'Document ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Document updated successfully',
+    type: DocumentResponseDto,
+  })
+  async updateDocument(
+    @Param('id') id: string,
+    @Body() updateDto: UpdateDocumentDto,
+    @CurrentUser() user: User,
+  ): Promise<DocumentResponseDto> {
+    return this.documentsService.updateDocument(id, user.id, updateDto);
   }
 
   @Delete(':id')

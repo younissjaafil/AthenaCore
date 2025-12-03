@@ -151,3 +151,42 @@ export class UploadDocumentDto {
   @IsOptional()
   metadata?: Record<string, any>;
 }
+
+/**
+ * DTO for updating document properties
+ */
+export class UpdateDocumentDto {
+  @ApiPropertyOptional({ description: 'Document title' })
+  @IsString()
+  @IsOptional()
+  title?: string;
+
+  @ApiPropertyOptional({ description: 'Document description' })
+  @IsString()
+  @IsOptional()
+  description?: string;
+
+  @ApiPropertyOptional({
+    enum: DocumentVisibility,
+    description: 'Who can see this document',
+  })
+  @IsEnum(DocumentVisibility)
+  @IsOptional()
+  visibility?: DocumentVisibility;
+
+  @ApiPropertyOptional({
+    enum: DocumentPricingType,
+    description: 'How is this document monetized',
+  })
+  @IsEnum(DocumentPricingType)
+  @IsOptional()
+  pricingType?: DocumentPricingType;
+
+  @ApiPropertyOptional({
+    description: 'Price in cents (for ONE_TIME or SUBSCRIPTION)',
+  })
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  priceCents?: number;
+}
