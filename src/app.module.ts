@@ -32,6 +32,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { AdminModule } from './modules/admin/admin.module';
 import { HealthModule } from './modules/health/health.module';
 import { FeedModule } from './modules/feed/feed.module';
+import { AcademicModule } from './modules/academic/academic.module';
 
 @Module({
   imports: [
@@ -61,6 +62,7 @@ import { FeedModule } from './modules/feed/feed.module';
     AdminModule,
     HealthModule,
     FeedModule,
+    AcademicModule,
   ],
   controllers: [AppController],
   providers: [

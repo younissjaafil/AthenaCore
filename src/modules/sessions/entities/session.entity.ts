@@ -108,6 +108,11 @@ export class Session {
   @Column({ name: 'payment_id', type: 'uuid', nullable: true })
   paymentId: string;
 
+  // Optional link to a course for course-specific sessions
+  @Column({ name: 'course_id', type: 'uuid', nullable: true })
+  @Index()
+  courseId?: string;
+
   @Column({ type: 'jsonb', nullable: true })
   metadata: Record<string, any>;
 

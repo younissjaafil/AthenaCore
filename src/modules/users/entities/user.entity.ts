@@ -45,6 +45,10 @@ export class User {
   @Column({ name: 'is_active', default: true })
   isActive: boolean;
 
+  // System users (like Course Jarvis) bypass Clerk auth
+  @Column({ name: 'is_system_user', default: false })
+  isSystemUser: boolean;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
