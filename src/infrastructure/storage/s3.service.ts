@@ -8,6 +8,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { ConfigService } from '../../config/config.service';
+import * as crypto from 'crypto';
 
 @Injectable()
 export class S3Service {
@@ -155,5 +156,93 @@ export class S3Service {
     const timestamp = Date.now();
     const sanitized = filename.replace(/[^a-zA-Z0-9.-]/g, '_');
     return `${prefix}/${timestamp}-${sanitized}`;
+  }
+
+  // ===== CONTENT-ADDRESSED BLOB STORAGE (NEW) =====
+
+  /**
+   * Compute SHA-256 hash of file content for deduplication
+   */
+  computeContentHash(buffer: Buffer): string {
+    return crypto.createHash('sha256').update(buffer).digest('hex');
+  }
+
+  /**
+   * Generate a blob key based on content hash
+   * Format: blobs/{hash_prefix}/{hash}.{ext}
+   * This enables content-addressed storage and deduplication
+   */
+  generateBlobKey(contentHash: string, mimeType: string): string {
+    const ext = this.getExtensionFromMimeType(mimeType);
+    const prefix = contentHash.slice(0, 2); // First 2 chars for directory sharding
+    return `blobs/${prefix}/${contentHash}.${ext}`;
+  }
+
+  /**
+   * Get file extension from MIME type
+   */
+  private getExtensionFromMimeType(mimeType: string): string {
+    const mimeToExt: Record<string, string> = {
+      'application/pdf': 'pdf',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+        'docx',
+      'application/msword': 'doc',
+      'text/plain': 'txt',
+      'text/markdown': 'md',
+      'text/html': 'html',
+      'text/csv': 'csv',
+      'application/json': 'json',
+      'image/png': 'png',
+      'image/jpeg': 'jpg',
+      'image/gif': 'gif',
+      'image/webp': 'webp',
+      'video/mp4': 'mp4',
+      'video/quicktime': 'mov',
+      'video/webm': 'webm',
+      'audio/mpeg': 'mp3',
+      'audio/wav': 'wav',
+      'audio/ogg': 'ogg',
+    };
+    return mimeToExt[mimeType] || 'bin';
+  }
+
+  /**
+   * Check if a blob already exists in S3 by its content hash
+   */
+  async blobExists(contentHash: string, mimeType: string): Promise<boolean> {
+    const key = this.generateBlobKey(contentHash, mimeType);
+    return this.fileExists(key);
+  }
+
+  /**
+   * Upload a file as a content-addressed blob
+   * Returns the S3 key and whether it was a new upload or reused existing
+   */
+  async uploadBlob(
+    buffer: Buffer,
+    mimeType: string,
+  ): Promise<{ s3Key: string; contentHash: string; isNew: boolean }> {
+    const contentHash = this.computeContentHash(buffer);
+    const s3Key = this.generateBlobKey(contentHash, mimeType);
+
+    // Check if blob already exists
+    const exists = await this.fileExists(s3Key);
+
+    if (exists) {
+      this.logger.log(`Blob already exists, reusing: ${s3Key}`);
+      return { s3Key, contentHash, isNew: false };
+    }
+
+    // Upload new blob
+    await this.uploadFile(buffer, s3Key, mimeType);
+    this.logger.log(`New blob uploaded: ${s3Key}`);
+    return { s3Key, contentHash, isNew: true };
+  }
+
+  /**
+   * Get the public URL for a blob
+   */
+  getBlobUrl(s3Key: string): string {
+    return `https://${this.bucketName}.s3.${this.region}.amazonaws.com/${s3Key}`;
   }
 }

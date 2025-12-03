@@ -1,12 +1,26 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  DocumentOwnerType,
+  DocumentKind,
+  DocumentVisibility,
+  DocumentPricingType,
+} from '../entities/document.entity';
 
 export class DocumentResponseDto {
   @ApiProperty()
   id: string;
 
-  @ApiProperty()
-  agentId: string;
+  // ===== OWNERSHIP =====
+  @ApiProperty({ enum: DocumentOwnerType })
+  ownerType: DocumentOwnerType;
 
+  @ApiProperty()
+  ownerId: string;
+
+  @ApiPropertyOptional()
+  agentId?: string;
+
+  // ===== FILE INFO =====
   @ApiProperty()
   filename: string;
 
@@ -22,6 +36,7 @@ export class DocumentResponseDto {
   @ApiPropertyOptional()
   s3Url?: string;
 
+  // ===== PROCESSING STATUS =====
   @ApiProperty()
   status: string;
 
@@ -34,6 +49,35 @@ export class DocumentResponseDto {
   @ApiPropertyOptional()
   errorMessage?: string;
 
+  // ===== USAGE FLAGS =====
+  @ApiProperty()
+  forProfile: boolean;
+
+  @ApiProperty()
+  forRag: boolean;
+
+  // ===== CONTENT CLASSIFICATION =====
+  @ApiProperty({ enum: DocumentKind })
+  kind: DocumentKind;
+
+  @ApiProperty({ enum: DocumentVisibility })
+  visibility: DocumentVisibility;
+
+  // ===== MONETIZATION =====
+  @ApiProperty({ enum: DocumentPricingType })
+  pricingType: DocumentPricingType;
+
+  @ApiPropertyOptional()
+  priceCents?: number;
+
+  @ApiProperty()
+  currency: string;
+
+  // ===== DEDUPLICATION =====
+  @ApiPropertyOptional()
+  contentHash?: string;
+
+  // ===== METADATA =====
   @ApiPropertyOptional()
   metadata?: {
     title?: string;
@@ -49,4 +93,45 @@ export class DocumentResponseDto {
 
   @ApiProperty()
   updatedAt: Date;
+}
+
+/**
+ * Simplified response for public profile listing
+ */
+export class PublicDocumentResponseDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty()
+  filename: string;
+
+  @ApiProperty()
+  fileType: string;
+
+  @ApiProperty()
+  fileSize: number;
+
+  @ApiProperty({ enum: DocumentKind })
+  kind: DocumentKind;
+
+  @ApiProperty({ enum: DocumentVisibility })
+  visibility: DocumentVisibility;
+
+  @ApiProperty({ enum: DocumentPricingType })
+  pricingType: DocumentPricingType;
+
+  @ApiPropertyOptional()
+  priceCents?: number;
+
+  @ApiProperty()
+  currency: string;
+
+  @ApiPropertyOptional()
+  title?: string;
+
+  @ApiPropertyOptional()
+  description?: string;
+
+  @ApiProperty()
+  createdAt: Date;
 }

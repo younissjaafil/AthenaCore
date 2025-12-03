@@ -27,17 +27,64 @@ export enum DocumentType {
   JSON = 'json',
 }
 
+// Owner type: who owns this document
+export enum DocumentOwnerType {
+  AGENT = 'AGENT', // Traditional RAG docs for an agent (backwards compatible)
+  CREATOR = 'CREATOR', // Creator's profile content
+  // CLASS_BOT = 'CLASS_BOT', // Future: Jarvis family bots
+}
+
+// Document kind: what type of content
+export enum DocumentKind {
+  DOC = 'DOC', // PDF, DOCX, TXT, etc.
+  VIDEO = 'VIDEO', // MP4, MOV, etc.
+  IMAGE = 'IMAGE', // PNG, JPG, etc.
+  AUDIO = 'AUDIO', // MP3, WAV, etc.
+}
+
+// Visibility: who can see this document
+export enum DocumentVisibility {
+  PUBLIC = 'PUBLIC', // Anyone can see
+  FOLLOWERS = 'FOLLOWERS', // Only followers
+  SUBSCRIBERS = 'SUBSCRIBERS', // Only subscribers (paid)
+  // CLASS_ONLY = 'CLASS_ONLY', // Future: Only class members
+  PRIVATE = 'PRIVATE', // Only owner
+}
+
+// Pricing type: how is this document monetized
+export enum DocumentPricingType {
+  FREE = 'FREE', // No payment required
+  ONE_TIME = 'ONE_TIME', // One-time purchase
+  SUBSCRIPTION = 'SUBSCRIPTION', // Part of subscription
+  // CLASS_ONLY = 'CLASS_ONLY', // Future: Included with class enrollment
+}
+
 @Entity('document')
 @Index(['agentId', 'status'])
+@Index(['ownerType', 'ownerId'])
+@Index(['contentHash'])
 export class Document {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ name: 'agent_id' })
+  // ===== OWNERSHIP (NEW) =====
+  @Column({
+    name: 'owner_type',
+    type: 'varchar',
+    length: 20,
+    default: DocumentOwnerType.AGENT,
+  })
+  ownerType: DocumentOwnerType;
+
+  @Column({ name: 'owner_id', type: 'uuid', nullable: true })
+  ownerId: string;
+
+  // Legacy: agent_id kept for backwards compatibility with existing RAG
+  @Column({ name: 'agent_id', nullable: true })
   @Index()
   agentId: string;
 
-  @ManyToOne(() => Agent, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Agent, { onDelete: 'SET NULL', nullable: true })
   @JoinColumn({ name: 'agent_id' })
   agent: Agent;
 
@@ -80,6 +127,50 @@ export class Document {
   // Error Handling
   @Column({ name: 'error_message', type: 'text', nullable: true })
   errorMessage?: string;
+
+  // ===== USAGE FLAGS (NEW) =====
+  @Column({ name: 'for_profile', type: 'boolean', default: false })
+  forProfile: boolean;
+
+  @Column({ name: 'for_rag', type: 'boolean', default: true })
+  forRag: boolean;
+
+  // @Column({ name: 'for_class', type: 'boolean', default: false })
+  // forClass: boolean; // Future: for CLASS_BOT
+
+  // ===== CONTENT CLASSIFICATION (NEW) =====
+  @Column({
+    type: 'varchar',
+    length: 20,
+    default: DocumentKind.DOC,
+  })
+  kind: DocumentKind;
+
+  @Column({
+    type: 'varchar',
+    length: 20,
+    default: DocumentVisibility.PRIVATE,
+  })
+  visibility: DocumentVisibility;
+
+  // ===== MONETIZATION (NEW) =====
+  @Column({
+    name: 'pricing_type',
+    type: 'varchar',
+    length: 20,
+    default: DocumentPricingType.FREE,
+  })
+  pricingType: DocumentPricingType;
+
+  @Column({ name: 'price_cents', type: 'int', nullable: true })
+  priceCents: number;
+
+  @Column({ type: 'varchar', length: 3, default: 'USD' })
+  currency: string;
+
+  // ===== DEDUPLICATION (NEW) =====
+  @Column({ name: 'content_hash', type: 'varchar', length: 64, nullable: true })
+  contentHash: string;
 
   // Metadata
   @Column({ type: 'jsonb', nullable: true })

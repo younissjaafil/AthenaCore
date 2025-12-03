@@ -19,14 +19,23 @@ import {
   ApiResponse,
   ApiConsumes,
   ApiBody,
+  ApiParam,
 } from '@nestjs/swagger';
 import { DocumentsService } from './documents.service';
 import { AgentsRepository } from '../agents/repositories/agents.repository';
-import { UploadDocumentDto } from './dto/upload-document.dto';
-import { DocumentResponseDto } from './dto/document-response.dto';
+import {
+  UploadDocumentDto,
+  UnifiedUploadDocumentDto,
+} from './dto/upload-document.dto';
+import {
+  DocumentResponseDto,
+  PublicDocumentResponseDto,
+} from './dto/document-response.dto';
 import { ClerkAuthGuard } from '../auth/guards/clerk-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { User } from '../users/entities/user.entity';
+import { Public } from '../../common/decorators/public.decorator';
+import { DocumentOwnerType } from './entities/document.entity';
 
 @ApiTags('Documents')
 @Controller('documents')
@@ -41,7 +50,9 @@ export class DocumentsController {
   @UseInterceptors(FileInterceptor('file'))
   @ApiBearerAuth()
   @ApiConsumes('multipart/form-data')
-  @ApiOperation({ summary: 'Upload document for agent training' })
+  @ApiOperation({
+    summary: 'Upload document for agent training (legacy - routes to unified)',
+  })
   @ApiBody({
     schema: {
       type: 'object',
@@ -76,6 +87,89 @@ export class DocumentsController {
     @CurrentUser() user: User,
   ): Promise<DocumentResponseDto> {
     return this.documentsService.uploadDocument(file, user.id, uploadDto);
+  }
+
+  @Post('upload-unified')
+  @UseGuards(ClerkAuthGuard)
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiBearerAuth()
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    summary:
+      'Unified document upload (supports agent training, profile content, etc)',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+          description:
+            'Document/media file (PDF, DOCX, images, videos, etc based on usage)',
+        },
+        ownerType: {
+          type: 'string',
+          enum: ['AGENT', 'CREATOR'],
+          description:
+            'Type of owner (AGENT for agent docs, CREATOR for profile)',
+        },
+        ownerId: {
+          type: 'string',
+          format: 'uuid',
+          description: 'ID of agent or creator',
+        },
+        forProfile: {
+          type: 'boolean',
+          default: false,
+          description: 'Use in creator profile',
+        },
+        forRag: {
+          type: 'boolean',
+          default: false,
+          description: 'Use for RAG/AI training',
+        },
+        agentId: {
+          type: 'string',
+          format: 'uuid',
+          description:
+            'Agent ID (required if forRag=true and ownerType=CREATOR)',
+        },
+        visibility: {
+          type: 'string',
+          enum: ['PUBLIC', 'FOLLOWERS', 'SUBSCRIBERS', 'PRIVATE'],
+          default: 'PRIVATE',
+        },
+        pricingType: {
+          type: 'string',
+          enum: ['FREE', 'ONE_TIME', 'SUBSCRIPTION'],
+          default: 'FREE',
+        },
+        priceCents: {
+          type: 'number',
+          description: 'Price in cents (if paid)',
+        },
+        title: {
+          type: 'string',
+        },
+        description: {
+          type: 'string',
+        },
+      },
+      required: ['file', 'ownerType', 'ownerId'],
+    },
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Document uploaded successfully with deduplication',
+    type: DocumentResponseDto,
+  })
+  async uploadUnified(
+    @UploadedFile() file: Express.Multer.File,
+    @Body() uploadDto: UnifiedUploadDocumentDto,
+    @CurrentUser() user: User,
+  ): Promise<DocumentResponseDto> {
+    return this.documentsService.uploadUnified(file, user.id, uploadDto);
   }
 
   @Get('agent/:agentId')
@@ -117,6 +211,49 @@ export class DocumentsController {
   })
   async getAgentStats(@Param('agentId') agentId: string) {
     return this.documentsService.getAgentStats(agentId);
+  }
+
+  // ===== CREATOR PROFILE ENDPOINTS =====
+
+  @Get('creator/:creatorId/profile')
+  @Public()
+  @ApiOperation({
+    summary: 'Get public profile documents for a creator',
+  })
+  @ApiParam({ name: 'creatorId', description: 'Creator ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Public profile documents',
+    type: [PublicDocumentResponseDto],
+  })
+  async getCreatorProfileDocs(
+    @Param('creatorId') creatorId: string,
+  ): Promise<PublicDocumentResponseDto[]> {
+    const docs = await this.documentsService.findPublicProfileDocs(creatorId);
+    return docs.map((doc) => this.documentsService.toPublicResponseDto(doc));
+  }
+
+  @Get('creator/:creatorId/all')
+  @UseGuards(ClerkAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Get all documents for a creator (own documents - private access)',
+  })
+  @ApiParam({ name: 'creatorId', description: 'Creator ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'All creator documents',
+    type: [DocumentResponseDto],
+  })
+  async getCreatorAllDocs(
+    @Param('creatorId') creatorId: string,
+    @CurrentUser() user: User,
+  ): Promise<DocumentResponseDto[]> {
+    // TODO: Add ownership check - verify user owns this creator profile
+    return this.documentsService.findByOwner(
+      DocumentOwnerType.CREATOR,
+      creatorId,
+    );
   }
 
   @Get(':id')

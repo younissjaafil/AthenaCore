@@ -1,7 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Document, DocumentStatus } from '../entities/document.entity';
+import {
+  Document,
+  DocumentStatus,
+  DocumentOwnerType,
+  DocumentVisibility,
+} from '../entities/document.entity';
 
 @Injectable()
 export class DocumentsRepository {
@@ -158,5 +163,91 @@ export class DocumentsRepository {
       })
       .orderBy('document.created_at', 'DESC')
       .getMany();
+  }
+
+  // ===== NEW UNIFIED METHODS =====
+
+  /**
+   * Find documents by owner (creator or agent)
+   */
+  async findByOwner(
+    ownerType: DocumentOwnerType,
+    ownerId: string,
+    options?: {
+      forRag?: boolean;
+      forProfile?: boolean;
+      visibility?: DocumentVisibility;
+    },
+  ): Promise<Document[]> {
+    const qb = this.repository
+      .createQueryBuilder('document')
+      .where('document.owner_type = :ownerType', { ownerType })
+      .andWhere('document.owner_id = :ownerId', { ownerId });
+
+    if (options?.forRag !== undefined) {
+      qb.andWhere('document.for_rag = :forRag', { forRag: options.forRag });
+    }
+
+    if (options?.forProfile !== undefined) {
+      qb.andWhere('document.for_profile = :forProfile', {
+        forProfile: options.forProfile,
+      });
+    }
+
+    if (options?.visibility) {
+      qb.andWhere('document.visibility = :visibility', {
+        visibility: options.visibility,
+      });
+    }
+
+    return qb.orderBy('document.created_at', 'DESC').getMany();
+  }
+
+  /**
+   * Count documents with a specific content hash (for deduplication)
+   */
+  async countByContentHash(contentHash: string | null): Promise<number> {
+    if (!contentHash) return 0;
+    return this.repository.count({
+      where: { contentHash },
+    });
+  }
+
+  /**
+   * Find document by content hash
+   */
+  async findByContentHash(contentHash: string): Promise<Document | null> {
+    return this.repository.findOne({
+      where: { contentHash },
+    });
+  }
+
+  /**
+   * Find public profile documents for a creator
+   */
+  async findPublicProfileDocs(creatorId: string): Promise<Document[]> {
+    return this.repository.find({
+      where: {
+        ownerType: DocumentOwnerType.CREATOR,
+        ownerId: creatorId,
+        forProfile: true,
+        visibility: DocumentVisibility.PUBLIC,
+      },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  /**
+   * Find RAG documents for an agent
+   */
+  async findRagDocsByAgent(agentId: string): Promise<Document[]> {
+    return this.repository.find({
+      where: {
+        agentId,
+        forRag: true,
+        status: DocumentStatus.PROCESSED,
+      },
+      order: { createdAt: 'DESC' },
+    });
   }
 }

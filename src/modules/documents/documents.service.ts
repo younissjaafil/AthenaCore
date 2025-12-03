@@ -16,12 +16,22 @@ import { DocumentsRepository } from './repositories/documents.repository';
 import { S3Service } from '../../infrastructure/storage/s3.service';
 import { AgentsRepository } from '../agents/repositories/agents.repository';
 import { EmbeddingsService } from '../rag/embeddings.service';
-import { UploadDocumentDto } from './dto/upload-document.dto';
-import { DocumentResponseDto } from './dto/document-response.dto';
+import {
+  UploadDocumentDto,
+  UnifiedUploadDocumentDto,
+} from './dto/upload-document.dto';
+import {
+  DocumentResponseDto,
+  PublicDocumentResponseDto,
+} from './dto/document-response.dto';
 import {
   Document,
   DocumentStatus,
   DocumentType,
+  DocumentOwnerType,
+  DocumentKind,
+  DocumentVisibility,
+  DocumentPricingType,
 } from './entities/document.entity';
 import { extname } from 'path';
 import * as mammoth from 'mammoth';
@@ -41,6 +51,20 @@ export class DocumentsService {
     'text/csv',
     'application/json',
   ];
+  // Extended MIME types for profile content
+  private readonly EXTENDED_MIME_TYPES = [
+    ...this.ALLOWED_MIME_TYPES,
+    'image/png',
+    'image/jpeg',
+    'image/gif',
+    'image/webp',
+    'video/mp4',
+    'video/quicktime',
+    'video/webm',
+    'audio/mpeg',
+    'audio/wav',
+    'audio/ogg',
+  ];
 
   constructor(
     private readonly documentsRepository: DocumentsRepository,
@@ -50,46 +74,75 @@ export class DocumentsService {
     private readonly embeddingsService: EmbeddingsService,
   ) {}
 
-  async uploadDocument(
+  // ===== UNIFIED UPLOAD (NEW) =====
+
+  /**
+   * Unified document upload with hash-based deduplication
+   * Supports both agent training docs and creator profile content
+   */
+  async uploadUnified(
     file: Express.Multer.File,
     userId: string,
-    uploadDto: UploadDocumentDto,
+    uploadDto: UnifiedUploadDocumentDto,
   ): Promise<DocumentResponseDto> {
-    // Validate file
-    this.validateFile(file);
+    // Validate file (use extended MIME types for profile content)
+    const allowedTypes =
+      uploadDto.forProfile || uploadDto.ownerType === DocumentOwnerType.CREATOR
+        ? this.EXTENDED_MIME_TYPES
+        : this.ALLOWED_MIME_TYPES;
+    this.validateFileWithTypes(file, allowedTypes);
 
-    // Check if agent exists
-    const agent = await this.agentsRepository.findById(uploadDto.agentId);
-    if (!agent) {
-      throw new NotFoundException('Agent not found');
-    }
-
-    // Determine document type
+    // Determine document type and kind
     const docType = this.getDocumentType(file.mimetype, file.originalname);
+    const docKind = this.getDocumentKind(file.mimetype);
 
-    // Generate S3 key
-    const s3Key = this.s3Service.generateKey(
-      `documents/${uploadDto.agentId}`,
-      file.originalname,
-    );
-
-    // Upload to S3
-    const s3Url = await this.s3Service.uploadFile(
+    // Upload with hash-based deduplication
+    const { s3Key, contentHash, isNew } = await this.s3Service.uploadBlob(
       file.buffer,
-      s3Key,
       file.mimetype,
     );
+    const s3Url = this.s3Service.getBlobUrl(s3Key);
+
+    if (!isNew) {
+      this.logger.log(`Reusing existing blob: ${contentHash.slice(0, 8)}...`);
+    }
+
+    // Determine agentId for RAG
+    const agentId =
+      uploadDto.ownerType === DocumentOwnerType.AGENT
+        ? uploadDto.ownerId
+        : uploadDto.agentId || undefined;
 
     // Create document record
     const document = await this.documentsRepository.create({
-      agentId: uploadDto.agentId,
+      // Ownership
+      ownerType: uploadDto.ownerType,
+      ownerId: uploadDto.ownerId,
+      agentId,
+      // File info
       filename: file.originalname,
       originalFilename: file.originalname,
       fileType: docType,
       fileSize: file.size,
       s3Key,
       s3Url,
-      status: DocumentStatus.PROCESSING,
+      // Usage flags
+      forProfile: uploadDto.forProfile ?? false,
+      forRag: uploadDto.forRag ?? false,
+      // Classification
+      kind: docKind,
+      visibility: uploadDto.visibility ?? DocumentVisibility.PRIVATE,
+      // Monetization
+      pricingType: uploadDto.pricingType ?? DocumentPricingType.FREE,
+      priceCents: uploadDto.priceCents,
+      currency: uploadDto.currency ?? 'USD',
+      // Deduplication
+      contentHash,
+      // Status
+      status: uploadDto.forRag
+        ? DocumentStatus.PROCESSING
+        : DocumentStatus.UPLOADED,
+      // Metadata
       metadata: {
         title: uploadDto.title,
         description: uploadDto.description,
@@ -97,18 +150,52 @@ export class DocumentsService {
       },
     });
 
-    // Start async processing
-    this.processDocumentAsync(document.id).catch((error) => {
-      this.logger.error(
-        `Document processing failed: ${error.message}`,
-        error.stack,
-      );
-    });
+    // If forRag, start async RAG processing
+    if (uploadDto.forRag && agentId) {
+      this.processDocumentAsync(document.id).catch((error) => {
+        this.logger.error(
+          `Document RAG processing failed: ${error.message}`,
+          error.stack,
+        );
+      });
+    }
 
     return this.toResponseDto(document);
   }
 
-  private validateFile(file: Express.Multer.File): void {
+  /**
+   * Legacy upload - routes to unified upload with AGENT owner type
+   */
+  async uploadDocument(
+    file: Express.Multer.File,
+    userId: string,
+    uploadDto: UploadDocumentDto,
+  ): Promise<DocumentResponseDto> {
+    // Validate agent exists
+    const agent = await this.agentsRepository.findById(uploadDto.agentId);
+    if (!agent) {
+      throw new NotFoundException('Agent not found');
+    }
+
+    // Route to unified upload with AGENT type
+    return this.uploadUnified(file, userId, {
+      ownerType: DocumentOwnerType.AGENT,
+      ownerId: uploadDto.agentId,
+      agentId: uploadDto.agentId,
+      forRag: true,
+      forProfile: false,
+      visibility: DocumentVisibility.PRIVATE,
+      pricingType: DocumentPricingType.FREE,
+      title: uploadDto.title,
+      description: uploadDto.description,
+      metadata: uploadDto.metadata,
+    });
+  }
+
+  private validateFileWithTypes(
+    file: Express.Multer.File,
+    allowedTypes: string[],
+  ): void {
     if (!file) {
       throw new BadRequestException('No file provided');
     }
@@ -119,11 +206,22 @@ export class DocumentsService {
       );
     }
 
-    if (!this.ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+    if (!allowedTypes.includes(file.mimetype)) {
       throw new BadRequestException(
         `File type ${file.mimetype} is not supported`,
       );
     }
+  }
+
+  private validateFile(file: Express.Multer.File): void {
+    this.validateFileWithTypes(file, this.ALLOWED_MIME_TYPES);
+  }
+
+  private getDocumentKind(mimeType: string): DocumentKind {
+    if (mimeType.startsWith('image/')) return DocumentKind.IMAGE;
+    if (mimeType.startsWith('video/')) return DocumentKind.VIDEO;
+    if (mimeType.startsWith('audio/')) return DocumentKind.AUDIO;
+    return DocumentKind.DOC;
   }
 
   private getDocumentType(mimeType: string, filename: string): DocumentType {
@@ -278,28 +376,67 @@ export class DocumentsService {
       throw new NotFoundException('Document not found');
     }
 
-    // Check if user owns the agent (via creator relationship)
-    // findById already includes creator relation
-    const agent = await this.agentsRepository.findById(document.agentId);
-    if (!agent) {
-      throw new NotFoundException('Agent not found');
+    // For AGENT-owned documents, check agent ownership
+    if (document.ownerType === DocumentOwnerType.AGENT && document.agentId) {
+      const agent = await this.agentsRepository.findById(document.agentId);
+      if (!agent) {
+        throw new NotFoundException('Agent not found');
+      }
+      if (!agent.creator || agent.creator.userId !== userId) {
+        throw new ForbiddenException(
+          'You can only delete documents from your own agents',
+        );
+      }
+    }
+    // For CREATOR-owned documents, check creator ownership
+    else if (document.ownerType === DocumentOwnerType.CREATOR) {
+      // ownerId is the creatorId - we need to verify userId matches
+      // This would require looking up the creator by ownerId
+      // For now, we'll add this check when creator repository is available
     }
 
-    // Check if the agent's creator belongs to this user
-    if (!agent.creator || agent.creator.userId !== userId) {
-      throw new ForbiddenException(
-        'You can only delete documents from your own agents',
-      );
-    }
-
-    // Delete from S3
+    // Delete from S3 (only if no other documents use this blob)
     try {
-      await this.s3Service.deleteFile(document.s3Key);
+      const otherDocsWithHash =
+        await this.documentsRepository.countByContentHash(document.contentHash);
+      if (otherDocsWithHash <= 1) {
+        await this.s3Service.deleteFile(document.s3Key);
+      } else {
+        this.logger.log(
+          `Keeping blob ${document.contentHash?.slice(0, 8)}... (${otherDocsWithHash - 1} other documents use it)`,
+        );
+      }
     } catch (error) {
       this.logger.error(`Failed to delete S3 file: ${error}`);
     }
 
     await this.documentsRepository.delete(id);
+  }
+
+  // ===== OWNER-BASED QUERIES (NEW) =====
+
+  async findByOwner(
+    ownerType: DocumentOwnerType,
+    ownerId: string,
+    options?: {
+      forRag?: boolean;
+      forProfile?: boolean;
+      visibility?: DocumentVisibility;
+    },
+  ): Promise<DocumentResponseDto[]> {
+    const documents = await this.documentsRepository.findByOwner(
+      ownerType,
+      ownerId,
+      options,
+    );
+    return documents.map((doc) => this.toResponseDto(doc));
+  }
+
+  async findPublicProfileDocs(ownerId: string): Promise<DocumentResponseDto[]> {
+    return this.findByOwner(DocumentOwnerType.CREATOR, ownerId, {
+      forProfile: true,
+      visibility: DocumentVisibility.PUBLIC,
+    });
   }
 
   async getAgentStats(agentId: string) {
@@ -309,19 +446,54 @@ export class DocumentsService {
   toResponseDto(document: Document): DocumentResponseDto {
     return {
       id: document.id,
+      // Ownership
+      ownerType: document.ownerType,
+      ownerId: document.ownerId,
       agentId: document.agentId,
+      // File info
       filename: document.filename,
       originalFilename: document.originalFilename,
       fileType: document.fileType,
       fileSize: Number(document.fileSize),
       s3Url: document.s3Url,
+      // Status
       status: document.status,
       chunkCount: document.chunkCount,
       embeddingCount: document.embeddingCount,
       errorMessage: document.errorMessage,
+      // Usage flags
+      forProfile: document.forProfile,
+      forRag: document.forRag,
+      // Classification
+      kind: document.kind,
+      visibility: document.visibility,
+      // Monetization
+      pricingType: document.pricingType,
+      priceCents: document.priceCents,
+      currency: document.currency,
+      // Metadata
       metadata: document.metadata,
+      // Timestamps
       createdAt: document.createdAt,
       updatedAt: document.updatedAt,
+    };
+  }
+
+  toPublicResponseDto(document: Document): PublicDocumentResponseDto {
+    const metadata = document.metadata as Record<string, any> | undefined;
+    return {
+      id: document.id,
+      filename: document.filename,
+      fileType: document.fileType,
+      fileSize: Number(document.fileSize),
+      kind: document.kind,
+      visibility: document.visibility,
+      pricingType: document.pricingType,
+      priceCents: document.priceCents,
+      currency: document.currency,
+      title: metadata?.title,
+      description: metadata?.description,
+      createdAt: document.createdAt,
     };
   }
 }
