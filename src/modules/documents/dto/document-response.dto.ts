@@ -106,6 +106,9 @@ export class PublicDocumentResponseDto {
   filename: string;
 
   @ApiProperty()
+  originalFilename: string;
+
+  @ApiProperty()
   fileType: string;
 
   @ApiProperty()

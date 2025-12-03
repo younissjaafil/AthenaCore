@@ -495,11 +495,27 @@ export class DocumentsService {
   ): Promise<PublicDocumentResponseDto[]> {
     const documents =
       await this.documentsRepository.findPublicProfileDocs(creatorId);
-    return documents.map((doc) => this.toPublicResponseDto(doc));
+    return Promise.all(
+      documents.map((doc) => this.toPublicResponseDtoAsync(doc)),
+    );
   }
 
   async getAgentStats(agentId: string) {
     return this.documentsRepository.getStatsByAgent(agentId);
+  }
+
+  /**
+   * Generate fresh pre-signed URL for S3 access (async version)
+   */
+  private async getSignedS3Url(s3Key: string): Promise<string | undefined> {
+    if (!s3Key) return undefined;
+    try {
+      // Generate a 1-hour pre-signed URL
+      return await this.s3Service.getSignedUrl(s3Key, 3600);
+    } catch (error) {
+      this.logger.error(`Failed to generate signed URL for ${s3Key}:`, error);
+      return undefined;
+    }
   }
 
   toResponseDto(document: Document): DocumentResponseDto {
@@ -538,14 +554,50 @@ export class DocumentsService {
     };
   }
 
+  /**
+   * Sync version - uses stored URL (may be expired)
+   * Use toPublicResponseDtoAsync for fresh signed URLs
+   */
   toPublicResponseDto(document: Document): PublicDocumentResponseDto {
     const metadata = document.metadata as Record<string, any> | undefined;
     return {
       id: document.id,
       filename: document.filename,
+      originalFilename: document.originalFilename,
       fileType: document.fileType,
       fileSize: Number(document.fileSize),
       s3Url: document.s3Url,
+      kind: document.kind,
+      visibility: document.visibility,
+      pricingType: document.pricingType,
+      priceCents: document.priceCents,
+      currency: document.currency,
+      title: metadata?.title,
+      description: metadata?.description,
+      status: document.status,
+      chunkCount: document.chunkCount,
+      extractedText: document.extractedText,
+      createdAt: document.createdAt,
+    };
+  }
+
+  /**
+   * Async version - generates fresh pre-signed S3 URL
+   * Use this for public-facing APIs to ensure URLs work
+   */
+  async toPublicResponseDtoAsync(
+    document: Document,
+  ): Promise<PublicDocumentResponseDto> {
+    const metadata = document.metadata as Record<string, any> | undefined;
+    const signedUrl = await this.getSignedS3Url(document.s3Key);
+
+    return {
+      id: document.id,
+      filename: document.filename,
+      originalFilename: document.originalFilename,
+      fileType: document.fileType,
+      fileSize: Number(document.fileSize),
+      s3Url: signedUrl,
       kind: document.kind,
       visibility: document.visibility,
       pricingType: document.pricingType,
