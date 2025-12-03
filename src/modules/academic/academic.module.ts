@@ -11,9 +11,11 @@ import { University, Major, Course } from './entities';
 import { User } from '../users/entities/user.entity';
 import { UserProfile } from '../profiles/entities';
 import { Creator } from '../creators/entities/creator.entity';
+import { UsersModule } from '../users/users.module';
 
 @Module({
   imports: [
+    UsersModule,
     TypeOrmModule.forFeature([
       University,
       Major,

@@ -555,6 +555,7 @@ export class DocumentsService {
       description: metadata?.description,
       status: document.status,
       chunkCount: document.chunkCount,
+      extractedText: document.extractedText,
       createdAt: document.createdAt,
     };
   }

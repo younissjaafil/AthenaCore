@@ -141,6 +141,9 @@ export class PublicDocumentResponseDto {
   @ApiPropertyOptional()
   chunkCount?: number;
 
+  @ApiPropertyOptional()
+  extractedText?: string;
+
   @ApiProperty()
   createdAt: Date;
 }
