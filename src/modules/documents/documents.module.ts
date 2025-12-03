@@ -8,6 +8,7 @@ import { AgentsModule } from '../agents/agents.module';
 import { S3Module } from '../../infrastructure/storage/s3.module';
 import { UsersModule } from '../users/users.module';
 import { RagModule } from '../rag/rag.module';
+import { CreatorsModule } from '../creators/creators.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { RagModule } from '../rag/rag.module';
     S3Module,
     UsersModule,
     forwardRef(() => RagModule),
+    forwardRef(() => CreatorsModule),
   ],
   controllers: [DocumentsController],
   providers: [DocumentsService, DocumentsRepository],

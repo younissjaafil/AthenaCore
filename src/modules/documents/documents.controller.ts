@@ -23,6 +23,7 @@ import {
 } from '@nestjs/swagger';
 import { DocumentsService } from './documents.service';
 import { AgentsRepository } from '../agents/repositories/agents.repository';
+import { CreatorsService } from '../creators/creators.service';
 import {
   UploadDocumentDto,
   UnifiedUploadDocumentDto,
@@ -43,6 +44,7 @@ export class DocumentsController {
   constructor(
     private readonly documentsService: DocumentsService,
     private readonly agentsRepository: AgentsRepository,
+    private readonly creatorsService: CreatorsService,
   ) {}
 
   @Post('upload')
@@ -197,8 +199,13 @@ export class DocumentsController {
   async getMyDocuments(
     @CurrentUser() user: User,
   ): Promise<DocumentResponseDto[]> {
-    // Get documents from agents owned by this user
-    const agents = await this.agentsRepository.findByCreator(user.id);
+    // Get creator profile from user
+    const creator = await this.creatorsService.findByUserId(user.id);
+    if (!creator) {
+      return [];
+    }
+    // Get documents from agents owned by this creator
+    const agents = await this.agentsRepository.findByCreator(creator.id);
     const agentIds = agents.map((a) => a.id);
     return this.documentsService.findByAgents(agentIds);
   }
@@ -229,8 +236,8 @@ export class DocumentsController {
   async getCreatorProfileDocs(
     @Param('creatorId') creatorId: string,
   ): Promise<PublicDocumentResponseDto[]> {
-    const docs = await this.documentsService.findPublicProfileDocs(creatorId);
-    return docs.map((doc) => this.documentsService.toPublicResponseDto(doc));
+    // findPublicProfileDocs already returns properly formatted DTOs
+    return this.documentsService.findPublicProfileDocs(creatorId);
   }
 
   @Get('creator/:creatorId/all')
@@ -249,7 +256,12 @@ export class DocumentsController {
     @Param('creatorId') creatorId: string,
     @CurrentUser() user: User,
   ): Promise<DocumentResponseDto[]> {
-    // TODO: Add ownership check - verify user owns this creator profile
+    // Verify user owns this creator profile
+    const creator = await this.creatorsService.findByUserId(user.id);
+    if (!creator || creator.id !== creatorId) {
+      // If not the owner, return empty array (or could throw ForbiddenException)
+      return [];
+    }
     return this.documentsService.findByOwner(
       DocumentOwnerType.CREATOR,
       creatorId,
