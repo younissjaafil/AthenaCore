@@ -490,11 +490,12 @@ export class DocumentsService {
     return documents.map((doc) => this.toResponseDto(doc));
   }
 
-  async findPublicProfileDocs(ownerId: string): Promise<DocumentResponseDto[]> {
-    return this.findByOwner(DocumentOwnerType.CREATOR, ownerId, {
-      forProfile: true,
-      visibility: DocumentVisibility.PUBLIC,
-    });
+  async findPublicProfileDocs(
+    creatorId: string,
+  ): Promise<DocumentResponseDto[]> {
+    const documents =
+      await this.documentsRepository.findPublicProfileDocs(creatorId);
+    return documents.map((doc) => this.toResponseDto(doc));
   }
 
   async getAgentStats(agentId: string) {

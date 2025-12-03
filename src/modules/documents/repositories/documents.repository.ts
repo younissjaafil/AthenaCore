@@ -224,17 +224,34 @@ export class DocumentsRepository {
 
   /**
    * Find public profile documents for a creator
+   * Includes both:
+   * 1. Documents owned directly by creator with forProfile=true
+   * 2. Documents owned by creator's agents with visibility=PUBLIC
    */
   async findPublicProfileDocs(creatorId: string): Promise<Document[]> {
-    return this.repository.find({
-      where: {
-        ownerType: DocumentOwnerType.CREATOR,
-        ownerId: creatorId,
-        forProfile: true,
-        visibility: DocumentVisibility.PUBLIC,
-      },
-      order: { createdAt: 'DESC' },
-    });
+    return this.repository
+      .createQueryBuilder('document')
+      .leftJoinAndSelect('document.agent', 'agent')
+      .where(
+        // Creator-owned documents with forProfile=true and PUBLIC visibility
+        '(document.owner_type = :creatorType AND document.owner_id = :creatorId AND document.for_profile = true AND document.visibility = :publicVis)',
+        {
+          creatorType: DocumentOwnerType.CREATOR,
+          creatorId,
+          publicVis: DocumentVisibility.PUBLIC,
+        },
+      )
+      .orWhere(
+        // Agent-owned documents where agent belongs to creator and visibility is PUBLIC
+        '(document.owner_type = :agentType AND agent.creator_id = :creatorId AND document.visibility = :publicVis)',
+        {
+          agentType: DocumentOwnerType.AGENT,
+          creatorId,
+          publicVis: DocumentVisibility.PUBLIC,
+        },
+      )
+      .orderBy('document.created_at', 'DESC')
+      .getMany();
   }
 
   /**
