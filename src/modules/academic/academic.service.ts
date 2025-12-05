@@ -415,7 +415,7 @@ export class AcademicService {
       );
     }
 
-    // 3. Generate unique identifiers
+    // 3. Generate unique identifier
     const universityCode = course.major?.university?.code || 'UNI';
     const courseCode = course.code.replace(/\s+/g, '').toLowerCase();
     const jarvisHandle = `jarvis-${universityCode.toLowerCase()}-${courseCode}`;
