@@ -298,11 +298,26 @@ export class DocumentsService {
     }
   }
 
+  /**
+   * Sanitize text to remove null bytes and invalid UTF-8 sequences
+   * PostgreSQL text columns cannot store null bytes (0x00)
+   */
+  private sanitizeText(text: string): string {
+    // Remove null bytes and other control characters that break PostgreSQL
+    // Keep newlines (\n), tabs (\t), and carriage returns (\r)
+    return text
+      .replace(/\x00/g, '') // Remove null bytes
+      .replace(/[\x01-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '') // Remove other control chars except \t, \n, \r
+      .normalize('NFC'); // Normalize Unicode
+  }
+
   private async extractText(
     buffer: Buffer,
     type: DocumentType,
   ): Promise<string> {
     try {
+      let text: string;
+      
       switch (type) {
         case DocumentType.PDF: {
           this.logger.log('Extracting text from PDF...');
@@ -310,13 +325,15 @@ export class DocumentsService {
           this.logger.log(
             `PDF extracted: ${pdfData.numpages} pages, ${pdfData.text.length} chars`,
           );
-          return pdfData.text;
+          text = pdfData.text;
+          break;
         }
 
         case DocumentType.DOCX: {
           this.logger.log('Extracting text from DOCX...');
           const docxResult = await mammoth.extractRawText({ buffer });
-          return docxResult.value;
+          text = docxResult.value;
+          break;
         }
 
         case DocumentType.TXT:
@@ -324,11 +341,15 @@ export class DocumentsService {
         case DocumentType.HTML:
         case DocumentType.CSV:
         case DocumentType.JSON:
-          return buffer.toString('utf-8');
+          text = buffer.toString('utf-8');
+          break;
 
         default:
-          return buffer.toString('utf-8');
+          text = buffer.toString('utf-8');
       }
+      
+      // Sanitize the extracted text to remove invalid characters
+      return this.sanitizeText(text);
     } catch (error: any) {
       this.logger.error(`Text extraction failed: ${error.message}`);
       throw new BadRequestException(
