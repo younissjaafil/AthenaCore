@@ -40,11 +40,11 @@ export class PdfPreviewService {
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       this.pdfPoppler = require('pdf-poppler') as PdfPoppler;
-      this.logger.log('pdf-poppler initialized');
+      this.logger.log('PDF preview enabled (pdf-poppler loaded)');
     } catch {
-      this.logger.warn(
-        'pdf-poppler not available - PDF preview will be disabled',
-      );
+      // pdf-poppler requires native Poppler binaries which aren't available on Linux/Railway
+      // This is expected in production - PDF preview will be disabled gracefully
+      this.logger.log('PDF preview disabled (pdf-poppler not installed)');
     }
   }
 
