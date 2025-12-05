@@ -317,7 +317,7 @@ export class DocumentsService {
   ): Promise<string> {
     try {
       let text: string;
-      
+
       switch (type) {
         case DocumentType.PDF: {
           this.logger.log('Extracting text from PDF...');
@@ -347,7 +347,7 @@ export class DocumentsService {
         default:
           text = buffer.toString('utf-8');
       }
-      
+
       // Sanitize the extracted text to remove invalid characters
       return this.sanitizeText(text);
     } catch (error: any) {
