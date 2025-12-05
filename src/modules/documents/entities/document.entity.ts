@@ -124,8 +124,7 @@ export class Document {
   @Column({ name: 'embedding_count', type: 'int', default: 0 })
   embeddingCount: number;
 
-  @Column({ name: 'page_count', type: 'int', nullable: true })
-  pageCount?: number;
+  // Note: pageCount removed - PDF preview feature disabled (pdf-poppler not available on Linux)
 
   // Error Handling
   @Column({ name: 'error_message', type: 'text', nullable: true })

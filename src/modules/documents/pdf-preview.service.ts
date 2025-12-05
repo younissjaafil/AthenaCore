@@ -76,11 +76,7 @@ export class PdfPreviewService {
       throw new BadRequestException('Page number must be at least 1');
     }
 
-    if (document.pageCount && pageNumber > document.pageCount) {
-      throw new BadRequestException(
-        `Page ${pageNumber} does not exist. Document has ${document.pageCount} pages.`,
-      );
-    }
+    // Note: pageCount field removed from entity - bounds check skipped
 
     // Check if cached preview exists in S3
     const previewKey = this.getPreviewKey(documentId, pageNumber);
@@ -114,8 +110,15 @@ export class PdfPreviewService {
 
   /**
    * Get page count for a PDF document
+   * Note: No longer cached in DB since pageCount field removed
    */
   async getPageCount(documentId: string): Promise<number> {
+    if (!this.pdfPoppler) {
+      throw new BadRequestException(
+        'PDF preview is not available on this server',
+      );
+    }
+
     const document = await this.documentsRepository.findById(documentId);
     if (!document) {
       throw new NotFoundException('Document not found');
@@ -125,16 +128,8 @@ export class PdfPreviewService {
       throw new BadRequestException('Only PDF documents have pages');
     }
 
-    // Return cached count if available
-    if (document.pageCount) {
-      return document.pageCount;
-    }
-
-    // Calculate and cache
-    const pageCount = await this.calculatePageCount(document.s3Key);
-    await this.documentsRepository.update(documentId, { pageCount });
-
-    return pageCount;
+    // Calculate page count (not cached since feature is optional)
+    return await this.calculatePageCount(document.s3Key);
   }
 
   /**
@@ -253,22 +248,27 @@ export class PdfPreviewService {
 
   /**
    * Delete all previews for a document
+   * Note: Since pageCount not stored, we delete the preview folder prefix
    */
   async deleteDocumentPreviews(documentId: string): Promise<void> {
-    try {
-      const document = await this.documentsRepository.findById(documentId);
-      if (!document || !document.pageCount) return;
+    // PDF preview is disabled, no previews to delete
+    if (!this.pdfPoppler) {
+      return;
+    }
 
-      for (let page = 1; page <= document.pageCount; page++) {
+    try {
+      // Try to delete up to 1000 pages (reasonable max)
+      for (let page = 1; page <= 1000; page++) {
         const previewKey = this.getPreviewKey(documentId, page);
         try {
           await this.s3Service.deleteFile(previewKey);
         } catch {
-          // Ignore individual delete failures
+          // Stop when we hit a page that doesn't exist
+          break;
         }
       }
 
-      this.logger.log(`Deleted all previews for document ${documentId}`);
+      this.logger.log(`Deleted previews for document ${documentId}`);
     } catch (error) {
       this.logger.error(`Failed to delete previews: ${error}`);
     }
