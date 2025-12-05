@@ -341,9 +341,7 @@ export class DocumentsController {
       },
     },
   })
-  async getPreviewInfo(
-    @Param('id') id: string,
-  ): Promise<{
+  async getPreviewInfo(@Param('id') id: string): Promise<{
     pageCount: number;
     hasPreviewsGenerated: boolean;
     previewAvailable: boolean;
@@ -384,8 +382,7 @@ export class DocumentsController {
     await this.documentsService.findById(id);
 
     // Check if previews have been generated
-    const hasPreview =
-      await this.pdfPreviewService.hasPreviewsGenerated(id);
+    const hasPreview = await this.pdfPreviewService.hasPreviewsGenerated(id);
 
     if (!hasPreview) {
       throw new NotFoundException(
@@ -423,7 +420,9 @@ export class DocumentsController {
 
     // Only PDFs can have previews generated
     if (!document.fileType?.includes('pdf')) {
-      throw new BadRequestException('Only PDF documents can have previews generated');
+      throw new BadRequestException(
+        'Only PDF documents can have previews generated',
+      );
     }
 
     // Generate previews

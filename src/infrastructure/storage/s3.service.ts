@@ -309,9 +309,7 @@ export class S3Service {
         }
       }
 
-      this.logger.log(
-        `Deleted ${deletedCount} files with prefix: ${prefix}`,
-      );
+      this.logger.log(`Deleted ${deletedCount} files with prefix: ${prefix}`);
       return deletedCount;
     } catch (error) {
       this.logger.error(`S3 delete by prefix failed for ${prefix}:`, error);
