@@ -11,7 +11,10 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Res,
+  ParseIntPipe,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiTags,
@@ -23,6 +26,7 @@ import {
   ApiParam,
 } from '@nestjs/swagger';
 import { DocumentsService } from './documents.service';
+import { PdfPreviewService } from './pdf-preview.service';
 import { AgentsRepository } from '../agents/repositories/agents.repository';
 import { CreatorsService } from '../creators/creators.service';
 import {
@@ -45,6 +49,7 @@ import { DocumentOwnerType } from './entities/document.entity';
 export class DocumentsController {
   constructor(
     private readonly documentsService: DocumentsService,
+    private readonly pdfPreviewService: PdfPreviewService,
     private readonly agentsRepository: AgentsRepository,
     private readonly creatorsService: CreatorsService,
   ) {}
@@ -307,14 +312,70 @@ export class DocumentsController {
   @UseGuards(ClerkAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Delete document' })
+  @ApiOperation({ summary: 'Delete document (admins can delete any document)' })
   @ApiResponse({ status: 204, description: 'Document deleted' })
   async deleteDocument(
     @Param('id') id: string,
     @CurrentUser() user: User,
   ): Promise<void> {
     // User ID is used as creator ID to verify ownership via agent
-    await this.documentsService.deleteDocument(id, user.id);
+    // Admins can delete any document
+    await this.documentsService.deleteDocument(id, user.id, user.roles || []);
+  }
+
+  // ===== PDF PREVIEW ENDPOINTS =====
+
+  @Get(':id/preview/info')
+  @Public()
+  @ApiOperation({ summary: 'Get PDF preview info (page count)' })
+  @ApiParam({ name: 'id', description: 'Document ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'PDF preview info',
+    schema: {
+      type: 'object',
+      properties: {
+        pageCount: { type: 'number' },
+      },
+    },
+  })
+  async getPreviewInfo(
+    @Param('id') id: string,
+  ): Promise<{ pageCount: number }> {
+    const pageCount = await this.pdfPreviewService.getPageCount(id);
+    return { pageCount };
+  }
+
+  @Get(':id/preview/:page')
+  @Public()
+  @ApiOperation({ summary: 'Get PDF page as image' })
+  @ApiParam({ name: 'id', description: 'Document ID' })
+  @ApiParam({ name: 'page', description: 'Page number (1-indexed)' })
+  @ApiResponse({
+    status: 200,
+    description: 'PNG image of the page',
+    content: {
+      'image/png': {
+        schema: { type: 'string', format: 'binary' },
+      },
+    },
+  })
+  async getPreviewPage(
+    @Param('id') id: string,
+    @Param('page', ParseIntPipe) page: number,
+    @Res() res: Response,
+  ): Promise<void> {
+    const { buffer, contentType } = await this.pdfPreviewService.getPageAsImage(
+      id,
+      page,
+    );
+
+    res.set({
+      'Content-Type': contentType,
+      'Content-Length': buffer.length,
+      'Cache-Control': 'public, max-age=86400', // Cache for 24 hours
+    });
+    res.send(buffer);
   }
 
   @Post(':id/reprocess')

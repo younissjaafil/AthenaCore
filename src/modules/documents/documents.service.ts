@@ -392,14 +392,24 @@ export class DocumentsService {
     return this.toResponseDto(document);
   }
 
-  async deleteDocument(id: string, userId: string): Promise<void> {
+  async deleteDocument(
+    id: string,
+    userId: string,
+    userRoles: string[] = [],
+  ): Promise<void> {
     const document = await this.documentsRepository.findById(id);
     if (!document) {
       throw new NotFoundException('Document not found');
     }
 
-    // For AGENT-owned documents, check agent ownership
-    if (document.ownerType === DocumentOwnerType.AGENT && document.agentId) {
+    const isAdmin = userRoles.includes('admin');
+
+    // For AGENT-owned documents, check agent ownership (admins can skip this)
+    if (
+      !isAdmin &&
+      document.ownerType === DocumentOwnerType.AGENT &&
+      document.agentId
+    ) {
       const agent = await this.agentsRepository.findById(document.agentId);
       if (!agent) {
         throw new NotFoundException('Agent not found');
@@ -410,11 +420,19 @@ export class DocumentsService {
         );
       }
     }
-    // For CREATOR-owned documents, check creator ownership
-    else if (document.ownerType === DocumentOwnerType.CREATOR) {
+    // For CREATOR-owned documents, check creator ownership (admins can skip this)
+    else if (!isAdmin && document.ownerType === DocumentOwnerType.CREATOR) {
       // ownerId is the creatorId - we need to verify userId matches
       // This would require looking up the creator by ownerId
       // For now, we'll add this check when creator repository is available
+    }
+
+    // Delete embeddings from vector store (Qdrant)
+    try {
+      await this.embeddingsService.deleteDocumentEmbeddings(id);
+      this.logger.log(`Deleted embeddings for document ${id}`);
+    } catch (error) {
+      this.logger.error(`Failed to delete embeddings: ${error}`);
     }
 
     // Delete from S3 (only if no other documents use this blob)

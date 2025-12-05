@@ -55,6 +55,7 @@
     "passport-jwt": "^4.0.1",
     "passport-local": "^1.0.0",
     "pdf-parse": "^1.1.1",
+    "pdf-poppler": "^0.2.3",
     "pdfjs-dist": "^4.0.379",
     "pg": "^8.13.1",
     "redis": "^5.10.0",
