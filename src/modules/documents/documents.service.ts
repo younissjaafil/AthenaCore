@@ -672,6 +672,9 @@ export class DocumentsService {
   }
 
   toResponseDto(document: Document): DocumentResponseDto {
+    // For PDFs, don't expose the S3 URL - force use of secure preview
+    const isPdf = document.fileType?.toLowerCase().includes('pdf');
+    
     return {
       id: document.id,
       // Ownership
@@ -683,7 +686,8 @@ export class DocumentsService {
       originalFilename: document.originalFilename,
       fileType: document.fileType,
       fileSize: Number(document.fileSize),
-      s3Url: document.s3Url,
+      // SECURITY: Don't expose S3 URL for PDFs - use preview endpoint instead
+      s3Url: isPdf ? undefined : document.s3Url,
       // Status
       status: document.status,
       chunkCount: document.chunkCount,
@@ -713,13 +717,17 @@ export class DocumentsService {
    */
   toPublicResponseDto(document: Document): PublicDocumentResponseDto {
     const metadata = document.metadata as Record<string, any> | undefined;
+    // For PDFs, don't expose the S3 URL - force use of secure preview
+    const isPdf = document.fileType?.toLowerCase().includes('pdf');
+    
     return {
       id: document.id,
       filename: document.filename,
       originalFilename: document.originalFilename,
       fileType: document.fileType,
       fileSize: Number(document.fileSize),
-      s3Url: document.s3Url,
+      // SECURITY: Don't expose S3 URL for PDFs - use preview endpoint instead
+      s3Url: isPdf ? undefined : document.s3Url,
       kind: document.kind,
       visibility: document.visibility,
       pricingType: document.pricingType,
@@ -737,12 +745,16 @@ export class DocumentsService {
   /**
    * Async version - generates fresh pre-signed S3 URL
    * Use this for public-facing APIs to ensure URLs work
+   * NOTE: For PDFs, s3Url is not returned - use preview endpoint
    */
   async toPublicResponseDtoAsync(
     document: Document,
   ): Promise<PublicDocumentResponseDto> {
     const metadata = document.metadata as Record<string, any> | undefined;
-    const signedUrl = await this.getSignedS3Url(document.s3Key);
+    
+    // For PDFs, don't expose the S3 URL - force use of secure preview
+    const isPdf = document.fileType?.toLowerCase().includes('pdf');
+    const signedUrl = isPdf ? undefined : await this.getSignedS3Url(document.s3Key);
 
     return {
       id: document.id,
@@ -750,6 +762,7 @@ export class DocumentsService {
       originalFilename: document.originalFilename,
       fileType: document.fileType,
       fileSize: Number(document.fileSize),
+      // SECURITY: Don't expose S3 URL for PDFs - use preview endpoint instead
       s3Url: signedUrl,
       kind: document.kind,
       visibility: document.visibility,
