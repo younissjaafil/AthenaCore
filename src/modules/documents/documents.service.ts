@@ -16,6 +16,7 @@ import { DocumentsRepository } from './repositories/documents.repository';
 import { S3Service } from '../../infrastructure/storage/s3.service';
 import { AgentsRepository } from '../agents/repositories/agents.repository';
 import { EmbeddingsService } from '../rag/embeddings.service';
+import { PdfPreviewService } from './pdf-preview.service';
 import {
   UploadDocumentDto,
   UnifiedUploadDocumentDto,
@@ -73,6 +74,8 @@ export class DocumentsService {
     private readonly s3Service: S3Service,
     @Inject(forwardRef(() => EmbeddingsService))
     private readonly embeddingsService: EmbeddingsService,
+    @Inject(forwardRef(() => PdfPreviewService))
+    private readonly pdfPreviewService: PdfPreviewService,
   ) {}
 
   // ===== UNIFIED UPLOAD (NEW) =====
@@ -161,7 +164,47 @@ export class DocumentsService {
       });
     }
 
+    // If PDF, generate watermarked preview images asynchronously
+    if (docType === DocumentType.PDF && this.pdfPreviewService.isAvailable()) {
+      this.generatePreviewsAsync(document.id, s3Key).catch((error) => {
+        this.logger.error(
+          `PDF preview generation failed: ${error.message}`,
+          error.stack,
+        );
+      });
+    }
+
     return this.toResponseDto(document);
+  }
+
+  /**
+   * Generate watermarked preview images for a PDF document (async)
+   */
+  private async generatePreviewsAsync(
+    documentId: string,
+    s3Key: string,
+  ): Promise<void> {
+    try {
+      this.logger.log(`Generating preview images for document ${documentId}`);
+      const result = await this.pdfPreviewService.generateAllPreviews(
+        documentId,
+        s3Key,
+      );
+      // Update document metadata with page count
+      await this.updateMetadata(documentId, {
+        pageCount: result.pageCount,
+        previewsGenerated: true,
+      });
+      this.logger.log(
+        `✅ Generated ${result.pageCount} preview pages for document ${documentId}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to generate previews for document ${documentId}:`,
+        error,
+      );
+      // Don't throw - preview generation is optional
+    }
   }
 
   /**
@@ -379,6 +422,17 @@ export class DocumentsService {
     return documents.map((doc) => this.toResponseDto(doc));
   }
 
+  /**
+   * Find document by ID (returns raw entity for internal use)
+   */
+  async findById(id: string): Promise<Document> {
+    const document = await this.documentsRepository.findById(id);
+    if (!document) {
+      throw new NotFoundException('Document not found');
+    }
+    return document;
+  }
+
   async findOne(id: string, agentId?: string): Promise<DocumentResponseDto> {
     const document = await this.documentsRepository.findById(id);
     if (!document) {
@@ -390,6 +444,28 @@ export class DocumentsService {
     }
 
     return this.toResponseDto(document);
+  }
+
+  /**
+   * Update document metadata (e.g., page count for PDFs)
+   */
+  async updateMetadata(
+    id: string,
+    metadata: Record<string, unknown>,
+  ): Promise<void> {
+    const document = await this.documentsRepository.findById(id);
+    if (!document) {
+      throw new NotFoundException('Document not found');
+    }
+
+    // Merge with existing metadata
+    const updatedMetadata = {
+      ...(document.metadata || {}),
+      ...metadata,
+    };
+
+    await this.documentsRepository.update(id, { metadata: updatedMetadata });
+    this.logger.log(`Updated metadata for document ${id}`);
   }
 
   async deleteDocument(

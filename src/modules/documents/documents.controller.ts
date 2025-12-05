@@ -11,10 +11,10 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
-  Res,
   ParseIntPipe,
+  NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
-import { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiTags,
@@ -327,7 +327,7 @@ export class DocumentsController {
 
   @Get(':id/preview/info')
   @Public()
-  @ApiOperation({ summary: 'Get PDF preview info (page count)' })
+  @ApiOperation({ summary: 'Get PDF preview info (page count, has previews)' })
   @ApiParam({ name: 'id', description: 'Document ID' })
   @ApiResponse({
     status: 200,
@@ -336,46 +336,111 @@ export class DocumentsController {
       type: 'object',
       properties: {
         pageCount: { type: 'number' },
+        hasPreviewsGenerated: { type: 'boolean' },
+        previewAvailable: { type: 'boolean' },
       },
     },
   })
   async getPreviewInfo(
     @Param('id') id: string,
-  ): Promise<{ pageCount: number }> {
-    const pageCount = await this.pdfPreviewService.getPageCount(id);
-    return { pageCount };
+  ): Promise<{
+    pageCount: number;
+    hasPreviewsGenerated: boolean;
+    previewAvailable: boolean;
+  }> {
+    const document = await this.documentsService.findById(id);
+    const hasPreviewsGenerated =
+      await this.pdfPreviewService.hasPreviewsGenerated(id);
+    const pageCount = document.metadata?.pageCount || 0;
+
+    return {
+      pageCount,
+      hasPreviewsGenerated,
+      previewAvailable: this.pdfPreviewService.isAvailable(),
+    };
   }
 
   @Get(':id/preview/:page')
   @Public()
-  @ApiOperation({ summary: 'Get PDF page as image' })
+  @ApiOperation({ summary: 'Get signed URL for PDF page preview image' })
   @ApiParam({ name: 'id', description: 'Document ID' })
   @ApiParam({ name: 'page', description: 'Page number (1-indexed)' })
   @ApiResponse({
     status: 200,
-    description: 'PNG image of the page',
-    content: {
-      'image/png': {
-        schema: { type: 'string', format: 'binary' },
+    description: 'Signed URL for the preview image (15 min expiry)',
+    schema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string' },
+        expiresIn: { type: 'number' },
       },
     },
   })
   async getPreviewPage(
     @Param('id') id: string,
     @Param('page', ParseIntPipe) page: number,
-    @Res() res: Response,
-  ): Promise<void> {
-    const { buffer, contentType } = await this.pdfPreviewService.getPageAsImage(
+  ): Promise<{ url: string; expiresIn: number }> {
+    // Verify document exists
+    await this.documentsService.findById(id);
+
+    // Check if previews have been generated
+    const hasPreview =
+      await this.pdfPreviewService.hasPreviewsGenerated(id);
+
+    if (!hasPreview) {
+      throw new NotFoundException(
+        'Preview not available for this document. It may still be processing.',
+      );
+    }
+
+    const url = await this.pdfPreviewService.getPreviewSignedUrl(id, page);
+    return { url, expiresIn: 900 }; // 15 minutes
+  }
+
+  @Post(':id/generate-previews')
+  @UseGuards(ClerkAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Generate watermarked preview images for a PDF document',
+  })
+  @ApiParam({ name: 'id', description: 'Document ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Previews generated successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        pageCount: { type: 'number' },
+        message: { type: 'string' },
+      },
+    },
+  })
+  async generatePreviews(
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+  ): Promise<{ pageCount: number; message: string }> {
+    const document = await this.documentsService.findById(id);
+
+    // Only PDFs can have previews generated
+    if (!document.fileType?.includes('pdf')) {
+      throw new BadRequestException('Only PDF documents can have previews generated');
+    }
+
+    // Generate previews
+    const result = await this.pdfPreviewService.generateAllPreviews(
       id,
-      page,
+      document.s3Key,
     );
 
-    res.set({
-      'Content-Type': contentType,
-      'Content-Length': buffer.length,
-      'Cache-Control': 'public, max-age=86400', // Cache for 24 hours
+    // Update document metadata with page count
+    await this.documentsService.updateMetadata(id, {
+      pageCount: result.pageCount,
     });
-    res.send(buffer);
+
+    return {
+      pageCount: result.pageCount,
+      message: `Generated ${result.pageCount} watermarked preview pages`,
+    };
   }
 
   @Post(':id/reprocess')

@@ -5,6 +5,7 @@ import {
   DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
+  ListObjectsV2Command,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { ConfigService } from '../../config/config.service';
@@ -244,5 +245,77 @@ export class S3Service {
    */
   getBlobUrl(s3Key: string): string {
     return `https://${this.bucketName}.s3.${this.region}.amazonaws.com/${s3Key}`;
+  }
+
+  /**
+   * Upload a buffer directly to S3 (alias for uploadFile with clearer naming)
+   */
+  async uploadBuffer(
+    buffer: Buffer,
+    key: string,
+    contentType?: string,
+  ): Promise<string> {
+    return this.uploadFile(buffer, key, contentType);
+  }
+
+  /**
+   * Get file metadata (used to check if file exists and get properties)
+   */
+  async getFileMetadata(
+    key: string,
+  ): Promise<{ contentLength?: number; contentType?: string }> {
+    try {
+      const command = new HeadObjectCommand({
+        Bucket: this.bucketName,
+        Key: key,
+      });
+
+      const response = await this.s3Client.send(command);
+      return {
+        contentLength: response.ContentLength,
+        contentType: response.ContentType,
+      };
+    } catch (error) {
+      this.logger.error(`S3 head object failed for key ${key}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete all files matching a prefix (for deleting document previews, etc.)
+   */
+  async deleteByPrefix(prefix: string): Promise<number> {
+    try {
+      // List all objects with the prefix
+      const listCommand = new ListObjectsV2Command({
+        Bucket: this.bucketName,
+        Prefix: prefix,
+      });
+
+      const listResponse = await this.s3Client.send(listCommand);
+      const contents = listResponse.Contents || [];
+
+      if (contents.length === 0) {
+        this.logger.log(`No files found with prefix: ${prefix}`);
+        return 0;
+      }
+
+      // Delete each object
+      let deletedCount = 0;
+      for (const obj of contents) {
+        if (obj.Key) {
+          await this.deleteFile(obj.Key);
+          deletedCount++;
+        }
+      }
+
+      this.logger.log(
+        `Deleted ${deletedCount} files with prefix: ${prefix}`,
+      );
+      return deletedCount;
+    } catch (error) {
+      this.logger.error(`S3 delete by prefix failed for ${prefix}:`, error);
+      throw error;
+    }
   }
 }
