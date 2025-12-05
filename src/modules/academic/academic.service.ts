@@ -419,7 +419,6 @@ export class AcademicService {
     const universityCode = course.major?.university?.code || 'UNI';
     const courseCode = course.code.replace(/\s+/g, '').toLowerCase();
     const jarvisHandle = `jarvis-${universityCode.toLowerCase()}-${courseCode}`;
-    const systemClerkId = `system-course-${courseId}`;
     const jarvisEmail = `${jarvisHandle}@athena.internal`;
     const displayName = `${course.code} – ${course.title} Jarvis`;
 
@@ -427,9 +426,8 @@ export class AcademicService {
       `Creating Jarvis for course ${course.code}: handle=${jarvisHandle}`,
     );
 
-    // 4. Create system user
+    // 4. Create system user (NO clerk_id - system users bypass Clerk)
     const user = this.userRepository.create({
-      clerkId: systemClerkId,
       email: jarvisEmail,
       username: jarvisHandle,
       firstName: course.code,
