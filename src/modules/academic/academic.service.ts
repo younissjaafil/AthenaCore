@@ -426,43 +426,75 @@ export class AcademicService {
       `Creating Jarvis for course ${course.code}: handle=${jarvisHandle}`,
     );
 
-    // 4. Create system user (NO clerk_id - system users bypass Clerk)
-    const user = this.userRepository.create({
-      email: jarvisEmail,
-      username: jarvisHandle,
-      firstName: course.code,
-      lastName: 'Jarvis',
-      roles: ['user', 'creator'],
-      isActive: true,
-      isSystemUser: true,
+    // 4. Check if system user already exists (from a previous partial attempt)
+    let savedUser = await this.userRepository.findOne({
+      where: { email: jarvisEmail },
     });
-    const savedUser = await this.userRepository.save(user);
-    this.logger.log(`Created system user: ${savedUser.id}`);
 
-    // 5. Create user profile
-    const profile = this.profileRepository.create({
-      userId: savedUser.id,
-      handle: jarvisHandle,
-      displayName: displayName,
-      bio: `AI Course Assistant for ${course.code} - ${course.title}. Ask me anything about the course material!`,
-    });
-    const savedProfile = await this.profileRepository.save(profile);
-    this.logger.log(`Created user profile: ${savedProfile.id}`);
+    if (!savedUser) {
+      // Create system user (NO clerk_id - system users bypass Clerk)
+      const user = this.userRepository.create({
+        email: jarvisEmail,
+        username: jarvisHandle,
+        firstName: course.code,
+        lastName: 'Jarvis',
+        roles: ['user', 'creator'],
+        isActive: true,
+        isSystemUser: true,
+      });
+      savedUser = await this.userRepository.save(user);
+      this.logger.log(`Created system user: ${savedUser.id}`);
+    } else {
+      this.logger.log(`Found existing system user: ${savedUser.id}`);
+    }
 
-    // 6. Create creator profile
-    const creator = this.creatorRepository.create({
-      userId: savedUser.id,
-      title: `${course.code} Course Assistant`,
-      bio: `AI-powered course assistant for ${course.code} - ${course.title}. Get help with course materials, practice problems, and study guidance.`,
-      tagline: 'Your AI Course Companion',
-      categories: ['Education', 'AI Assistant'],
-      specialties: ['Course Material', 'Study Help', 'Practice Problems'],
-      expertiseLevel: ExpertiseLevel.EXPERT,
-      isAvailable: true,
-      hourlyRate: 0, // Free for students
+    // 5. Update user profile (auto-created by DB trigger) or create if missing
+    let savedProfile = await this.profileRepository.findOne({
+      where: { userId: savedUser.id },
     });
-    const savedCreator = await this.creatorRepository.save(creator);
-    this.logger.log(`Created creator profile: ${savedCreator.id}`);
+
+    if (savedProfile) {
+      // Update the auto-created profile with Jarvis-specific data
+      savedProfile.handle = jarvisHandle;
+      savedProfile.displayName = displayName;
+      savedProfile.bio = `AI Course Assistant for ${course.code} - ${course.title}. Ask me anything about the course material!`;
+      savedProfile = await this.profileRepository.save(savedProfile);
+      this.logger.log(`Updated user profile: ${savedProfile.id}`);
+    } else {
+      // Fallback: create profile if trigger didn't run
+      const profile = this.profileRepository.create({
+        userId: savedUser.id,
+        handle: jarvisHandle,
+        displayName: displayName,
+        bio: `AI Course Assistant for ${course.code} - ${course.title}. Ask me anything about the course material!`,
+      });
+      savedProfile = await this.profileRepository.save(profile);
+      this.logger.log(`Created user profile: ${savedProfile.id}`);
+    }
+
+    // 6. Check if creator already exists
+    let savedCreator = await this.creatorRepository.findOne({
+      where: { userId: savedUser.id },
+    });
+
+    if (!savedCreator) {
+      // Create creator profile
+      const creator = this.creatorRepository.create({
+        userId: savedUser.id,
+        title: `${course.code} Course Assistant`,
+        bio: `AI-powered course assistant for ${course.code} - ${course.title}. Get help with course materials, practice problems, and study guidance.`,
+        tagline: 'Your AI Course Companion',
+        categories: ['Education', 'AI Assistant'],
+        specialties: ['Course Material', 'Study Help', 'Practice Problems'],
+        expertiseLevel: ExpertiseLevel.EXPERT,
+        isAvailable: true,
+        hourlyRate: 0, // Free for students
+      });
+      savedCreator = await this.creatorRepository.save(creator);
+      this.logger.log(`Created creator profile: ${savedCreator.id}`);
+    } else {
+      this.logger.log(`Found existing creator profile: ${savedCreator.id}`);
+    }
 
     // 7. Link creator to course
     await this.coursesRepository.linkCreator(courseId, savedCreator.id);
