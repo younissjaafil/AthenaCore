@@ -132,7 +132,7 @@ export class AdminService {
     const totalSpent = transactions.reduce((sum, txn) => sum + txn.amount, 0);
 
     return {
-      userId: user.clerkId,
+      userId: user.id, // Use internal UUID, not clerk_id (which may be null for system users)
       email: user.email,
       conversationCount,
       sessionCount,

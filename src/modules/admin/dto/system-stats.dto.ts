@@ -48,7 +48,10 @@ export class SystemStatsDto {
 }
 
 export class UserStatsDto {
-  @ApiProperty({ description: 'User ID', example: 'user_123' })
+  @ApiProperty({
+    description: 'Internal user ID (UUID)',
+    example: 'e7b7d484-4e24-4b4c-83a5-cad0827e061b',
+  })
   userId: string;
 
   @ApiProperty({ description: 'User email', example: 'user@example.com' })

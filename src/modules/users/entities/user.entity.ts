@@ -17,9 +17,9 @@ export class User {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ name: 'clerk_id', unique: true })
+  @Column({ name: 'clerk_id', unique: true, nullable: true })
   @Index()
-  clerkId: string;
+  clerkId?: string;
 
   @Column({ unique: true })
   @Index()
