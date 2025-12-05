@@ -11,6 +11,7 @@ import { University, Major, Course } from './entities';
 import { User } from '../users/entities/user.entity';
 import { UserProfile } from '../profiles/entities';
 import { Creator } from '../creators/entities/creator.entity';
+import { Agent } from '../agents/entities/agent.entity';
 import { UsersModule } from '../users/users.module';
 
 @Module({
@@ -23,6 +24,7 @@ import { UsersModule } from '../users/users.module';
       User,
       UserProfile,
       Creator,
+      Agent,
     ]),
   ],
   controllers: [AcademicController],

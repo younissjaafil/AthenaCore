@@ -17,6 +17,7 @@ import { University, Major, Course } from './entities';
 import { User } from '../users/entities/user.entity';
 import { UserProfile } from '../profiles/entities';
 import { Creator } from '../creators/entities/creator.entity';
+import { Agent } from '../agents/entities/agent.entity';
 import {
   CreateUniversityDto,
   UpdateUniversityDto,
@@ -46,6 +47,8 @@ export class AcademicService {
     private readonly profileRepository: Repository<UserProfile>,
     @InjectRepository(Creator)
     private readonly creatorRepository: Repository<Creator>,
+    @InjectRepository(Agent)
+    private readonly agentRepository: Repository<Agent>,
   ) {}
 
   // ==================== UTILITY METHODS ====================
@@ -500,10 +503,59 @@ export class AcademicService {
     await this.coursesRepository.linkCreator(courseId, savedCreator.id);
     this.logger.log(`Linked creator ${savedCreator.id} to course ${courseId}`);
 
+    // 8. Check if agent already exists for this creator
+    let savedAgent = await this.agentRepository.findOne({
+      where: { creatorId: savedCreator.id },
+    });
+
+    if (!savedAgent) {
+      // Create the course agent with a helpful system prompt
+      const systemPrompt = `You are an AI course assistant for ${course.code} - ${course.title}.
+
+Your role is to help students with:
+- Understanding course materials and concepts
+- Answering questions about the course content
+- Providing practice problems and examples
+- Offering study guidance and tips
+- Explaining difficult topics in simple terms
+
+Guidelines:
+- Be helpful, patient, and encouraging
+- Provide clear, accurate explanations
+- Use examples when helpful
+- If you're unsure about something, say so
+- Reference uploaded course materials when available
+- Stay focused on topics relevant to this course
+
+Remember: You have access to course documents that have been uploaded. Use this knowledge to provide accurate, course-specific answers.`;
+
+      const agent = this.agentRepository.create({
+        creatorId: savedCreator.id,
+        name: `${course.code} Course Assistant`,
+        description: `AI-powered course assistant for ${course.code} - ${course.title}. Get help with course materials, practice problems, and study guidance.`,
+        systemPrompt,
+        model: 'gpt-4',
+        temperature: 0.7,
+        maxTokens: 2000,
+        category: ['Education', 'AI Assistant'],
+        tags: [course.code, course.title, 'Course', 'Study Help'],
+        pricePerMessage: 0,
+        pricePerConversation: 0,
+        isFree: true,
+        isPublic: true,
+        status: 'active',
+      });
+      savedAgent = await this.agentRepository.save(agent);
+      this.logger.log(`Created course agent: ${savedAgent.id}`);
+    } else {
+      this.logger.log(`Found existing course agent: ${savedAgent.id}`);
+    }
+
     return {
       courseId,
       creatorId: savedCreator.id,
       userId: savedUser.id,
+      agentId: savedAgent.id,
       profileHandle: jarvisHandle,
       profileUrl: `/u/${jarvisHandle}`,
       displayName,
@@ -535,10 +587,16 @@ export class AcademicService {
       where: { userId: creator.userId },
     });
 
+    // Get the agent for this creator
+    const agent = await this.agentRepository.findOne({
+      where: { creatorId: creator.id },
+    });
+
     return {
       courseId,
       creatorId: creator.id,
       userId: creator.userId,
+      agentId: agent?.id || '',
       profileHandle: profile?.handle || '',
       profileUrl: profile ? `/u/${profile.handle}` : '',
       displayName: profile?.displayName || `${course.code} Jarvis`,

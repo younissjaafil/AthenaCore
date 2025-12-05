@@ -148,6 +148,9 @@ export class CreateJarvisResponseDto {
   @ApiProperty()
   userId: string;
 
+  @ApiProperty({ description: 'The auto-created agent ID for this course' })
+  agentId: string;
+
   @ApiProperty()
   profileHandle: string;
 
