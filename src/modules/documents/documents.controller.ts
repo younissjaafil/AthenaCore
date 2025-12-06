@@ -11,9 +11,6 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
-  ParseIntPipe,
-  NotFoundException,
-  BadRequestException,
   Logger,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -27,7 +24,6 @@ import {
   ApiParam,
 } from '@nestjs/swagger';
 import { DocumentsService } from './documents.service';
-import { PdfPreviewService } from './pdf-preview.service';
 import { AgentsRepository } from '../agents/repositories/agents.repository';
 import { CreatorsService } from '../creators/creators.service';
 import {
@@ -52,7 +48,6 @@ export class DocumentsController {
 
   constructor(
     private readonly documentsService: DocumentsService,
-    private readonly pdfPreviewService: PdfPreviewService,
     private readonly agentsRepository: AgentsRepository,
     private readonly creatorsService: CreatorsService,
   ) {}
@@ -278,176 +273,7 @@ export class DocumentsController {
     );
   }
 
-  // ===== PDF PREVIEW ENDPOINTS =====
-  // IMPORTANT: These must come BEFORE @Get(':id') to avoid route conflicts
-
-  @Get(':id/preview/info')
-  @Public()
-  @ApiOperation({ summary: 'Get PDF preview info (page count, has previews)' })
-  @ApiParam({ name: 'id', description: 'Document ID' })
-  @ApiResponse({
-    status: 200,
-    description: 'PDF preview info',
-    schema: {
-      type: 'object',
-      properties: {
-        pageCount: { type: 'number' },
-        hasPreviewsGenerated: { type: 'boolean' },
-        previewAvailable: { type: 'boolean' },
-      },
-    },
-  })
-  async getPreviewInfo(@Param('id') id: string): Promise<{
-    pageCount: number;
-    hasPreviewsGenerated: boolean;
-    previewAvailable: boolean;
-  }> {
-    // Check if PDF preview service is available on this server
-    const previewAvailable = this.pdfPreviewService?.isAvailable() ?? false;
-
-    // If preview not available, return graceful response instead of error
-    if (!previewAvailable) {
-      return {
-        pageCount: 0,
-        hasPreviewsGenerated: false,
-        previewAvailable: false,
-      };
-    }
-
-    const document = await this.documentsService.findById(id);
-    const hasPreviewsGenerated =
-      await this.pdfPreviewService.hasPreviewsGenerated(id);
-    const pageCount: number =
-      (document.metadata && (document.metadata.pageCount as number)) || 0;
-
-    return {
-      pageCount,
-      hasPreviewsGenerated,
-      previewAvailable: true,
-    };
-  }
-
-  @Get(':id/preview/:page')
-  @Public()
-  @ApiOperation({ summary: 'Get signed URL for PDF page preview image' })
-  @ApiParam({ name: 'id', description: 'Document ID' })
-  @ApiParam({ name: 'page', description: 'Page number (1-indexed)' })
-  @ApiResponse({
-    status: 200,
-    description: 'Signed URL for the preview image (15 min expiry)',
-    schema: {
-      type: 'object',
-      properties: {
-        url: { type: 'string' },
-        expiresIn: { type: 'number' },
-      },
-    },
-  })
-  async getPreviewPage(
-    @Param('id') id: string,
-    @Param('page', ParseIntPipe) page: number,
-  ): Promise<{ url: string; expiresIn: number }> {
-    // Check if PDF preview service is available
-    if (!this.pdfPreviewService?.isAvailable()) {
-      throw new NotFoundException(
-        'PDF preview is not available on this server. The server may not have the required dependencies (poppler-utils, sharp).',
-      );
-    }
-
-    // Verify document exists
-    const document = await this.documentsService.findById(id);
-
-    // Check if previews have been generated
-    let hasPreview = await this.pdfPreviewService.hasPreviewsGenerated(id);
-
-    // If previews are missing but this is a PDF, generate on-demand
-    if (!hasPreview) {
-      if (!document.fileType?.includes('pdf')) {
-        throw new BadRequestException(
-          'Only PDF documents support page preview',
-        );
-      }
-
-      const result = await this.pdfPreviewService.generateAllPreviews(
-        id,
-        document.s3Key,
-      );
-
-      // Update stored page count metadata for future requests
-      await this.documentsService.updateMetadata(id, {
-        pageCount: result.pageCount,
-      });
-      hasPreview = result.pageCount > 0;
-    }
-
-    if (!hasPreview) {
-      throw new NotFoundException(
-        'Preview not available for this document. It may still be processing.',
-      );
-    }
-
-    const url = await this.pdfPreviewService.getPreviewSignedUrl(id, page);
-    return { url, expiresIn: 900 }; // 15 minutes
-  }
-
-  @Post(':id/generate-previews')
-  @UseGuards(ClerkAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({
-    summary: 'Generate watermarked preview images for a PDF document',
-  })
-  @ApiParam({ name: 'id', description: 'Document ID' })
-  @ApiResponse({
-    status: 200,
-    description: 'Previews generated successfully',
-    schema: {
-      type: 'object',
-      properties: {
-        pageCount: { type: 'number' },
-        message: { type: 'string' },
-      },
-    },
-  })
-  async generatePreviews(
-    @Param('id') id: string,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    @CurrentUser() user: User,
-  ): Promise<{ pageCount: number; message: string }> {
-    const document = await this.documentsService.findById(id);
-
-    // Only PDFs can have previews generated
-    // Only PDFs can have previews generated
-    if (
-      !document.fileType?.toLowerCase().includes('pdf') &&
-      document.fileType !== 'application/pdf'
-    ) {
-      this.logger.warn(
-        `Attempted to generate preview for non-PDF document: ${id} (type: ${document.fileType})`,
-      );
-      throw new BadRequestException(
-        `Only PDF documents can have previews generated (found: ${document.fileType})`,
-      );
-    }
-
-    // Generate previews
-    const result = await this.pdfPreviewService.generateAllPreviews(
-      id,
-      document.s3Key,
-    );
-
-    // Update document metadata with page count
-    await this.documentsService.updateMetadata(id, {
-      pageCount: result.pageCount,
-    });
-
-    return {
-      pageCount: result.pageCount,
-      message: `Generated ${result.pageCount} watermarked preview pages`,
-    };
-  }
-
   // ===== GENERIC DOCUMENT ROUTES =====
-  // These come AFTER preview routes to avoid route conflicts
 
   @Get(':id')
   @UseGuards(ClerkAuthGuard)

@@ -16,7 +16,6 @@ import { DocumentsRepository } from './repositories/documents.repository';
 import { S3Service } from '../../infrastructure/storage/s3.service';
 import { AgentsRepository } from '../agents/repositories/agents.repository';
 import { EmbeddingsService } from '../rag/embeddings.service';
-import { PdfPreviewService } from './pdf-preview.service';
 import {
   UploadDocumentDto,
   UnifiedUploadDocumentDto,
@@ -74,8 +73,6 @@ export class DocumentsService {
     private readonly s3Service: S3Service,
     @Inject(forwardRef(() => EmbeddingsService))
     private readonly embeddingsService: EmbeddingsService,
-    @Inject(forwardRef(() => PdfPreviewService))
-    private readonly pdfPreviewService: PdfPreviewService,
   ) {}
 
   // ===== UNIFIED UPLOAD (NEW) =====
@@ -164,47 +161,7 @@ export class DocumentsService {
       });
     }
 
-    // If PDF, generate watermarked preview images asynchronously
-    if (docType === DocumentType.PDF && this.pdfPreviewService.isAvailable()) {
-      this.generatePreviewsAsync(document.id, s3Key).catch((error) => {
-        this.logger.error(
-          `PDF preview generation failed: ${error.message}`,
-          error.stack,
-        );
-      });
-    }
-
     return this.toResponseDto(document);
-  }
-
-  /**
-   * Generate watermarked preview images for a PDF document (async)
-   */
-  private async generatePreviewsAsync(
-    documentId: string,
-    s3Key: string,
-  ): Promise<void> {
-    try {
-      this.logger.log(`Generating preview images for document ${documentId}`);
-      const result = await this.pdfPreviewService.generateAllPreviews(
-        documentId,
-        s3Key,
-      );
-      // Update document metadata with page count
-      await this.updateMetadata(documentId, {
-        pageCount: result.pageCount,
-        previewsGenerated: true,
-      });
-      this.logger.log(
-        `✅ Generated ${result.pageCount} preview pages for document ${documentId}`,
-      );
-    } catch (error) {
-      this.logger.error(
-        `Failed to generate previews for document ${documentId}:`,
-        error,
-      );
-      // Don't throw - preview generation is optional
-    }
   }
 
   /**

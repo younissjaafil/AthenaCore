@@ -1,8 +1,4 @@
 # Railway Nixpacks configuration
-# Installs system dependencies required for PDF processing
-
-[phases.setup]
-nixPkgs = ["poppler_utils"]
 
 [phases.install]
 cmds = ["npm install --legacy-peer-deps"]
