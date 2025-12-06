@@ -355,10 +355,26 @@ export class DocumentsController {
     }
 
     // Verify document exists
-    await this.documentsService.findById(id);
+    const document = await this.documentsService.findById(id);
 
     // Check if previews have been generated
-    const hasPreview = await this.pdfPreviewService.hasPreviewsGenerated(id);
+    let hasPreview = await this.pdfPreviewService.hasPreviewsGenerated(id);
+
+    // If previews are missing but this is a PDF, generate on-demand
+    if (!hasPreview) {
+      if (!document.fileType?.includes('pdf')) {
+        throw new BadRequestException('Only PDF documents support page preview');
+      }
+
+      const result = await this.pdfPreviewService.generateAllPreviews(
+        id,
+        document.s3Key,
+      );
+
+      // Update stored page count metadata for future requests
+      await this.documentsService.updateMetadata(id, { pageCount: result.pageCount });
+      hasPreview = result.pageCount > 0;
+    }
 
     if (!hasPreview) {
       throw new NotFoundException(
