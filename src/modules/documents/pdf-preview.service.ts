@@ -3,6 +3,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { S3Service } from '../../infrastructure/storage/s3.service';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -17,23 +18,57 @@ export class PdfPreviewService {
   private readonly logger = new Logger(PdfPreviewService.name);
   private pdfPopplerAvailable = false;
   private sharpAvailable = false;
+  private isConfigEnabled = true;
 
-  constructor(private readonly s3Service: S3Service) {
+  constructor(
+    private readonly s3Service: S3Service,
+    private readonly configService: ConfigService,
+  ) {
+    this.isConfigEnabled =
+      this.configService.get<string>('PDF_PREVIEW_ENABLED', 'true') === 'true';
+
     void this.initDependencies();
   }
 
   private async initDependencies(): Promise<void> {
+    if (!this.isConfigEnabled) {
+      this.logger.log(
+        'ℹ️ PDF preview generation disabled by config (PDF_PREVIEW_ENABLED=false)',
+      );
+      return;
+    }
+
     // Check pdf-poppler
     try {
       pdfPoppler = await import('pdf-poppler');
-      this.pdfPopplerAvailable = true;
-      this.logger.log('✅ pdf-poppler loaded successfully');
-    } catch {
+
+      // On non-Windows platforms, we need to verify pdftoppm is actually installed
+      if (os.platform() !== 'win32') {
+        const { exec } = await import('child_process');
+        const util = await import('util');
+        const execAsync = util.promisify(exec);
+
+        try {
+          await execAsync('pdftoppm -v');
+          this.pdfPopplerAvailable = true;
+          this.logger.log('✅ pdf-poppler loaded and pdftoppm binary found');
+        } catch (e) {
+          this.logger.warn(
+            '⚠️ pdftoppm binary not found in PATH. PDF preview generation disabled.',
+          );
+          this.logger.warn(
+            'To enable: install poppler-utils (apt install poppler-utils, apk add poppler-utils, or brew install poppler)',
+          );
+          this.pdfPopplerAvailable = false;
+        }
+      } else {
+        // Windows version of pdf-poppler includes binaries
+        this.pdfPopplerAvailable = true;
+        this.logger.log('✅ pdf-poppler loaded successfully (Windows bundled)');
+      }
+    } catch (e) {
       this.logger.warn(
-        '⚠️ pdf-poppler not available. PDF preview generation disabled.',
-      );
-      this.logger.warn(
-        'To enable: install poppler-utils (apt install poppler-utils or brew install poppler)',
+        '⚠️ pdf-poppler import failed. PDF preview generation disabled.',
       );
     }
 
@@ -51,7 +86,9 @@ export class PdfPreviewService {
    * Check if PDF preview generation is available
    */
   isAvailable(): boolean {
-    return this.pdfPopplerAvailable && this.sharpAvailable;
+    return (
+      this.isConfigEnabled && this.pdfPopplerAvailable && this.sharpAvailable
+    );
   }
 
   /**

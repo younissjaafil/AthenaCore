@@ -14,6 +14,7 @@ import {
   ParseIntPipe,
   NotFoundException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
@@ -47,6 +48,8 @@ import { DocumentOwnerType } from './entities/document.entity';
 @ApiTags('Documents')
 @Controller('documents')
 export class DocumentsController {
+  private readonly logger = new Logger(DocumentsController.name);
+
   constructor(
     private readonly documentsService: DocumentsService,
     private readonly pdfPreviewService: PdfPreviewService,
@@ -378,9 +381,16 @@ export class DocumentsController {
     const document = await this.documentsService.findById(id);
 
     // Only PDFs can have previews generated
-    if (!document.fileType?.includes('pdf')) {
+    // Only PDFs can have previews generated
+    if (
+      !document.fileType?.toLowerCase().includes('pdf') &&
+      document.fileType !== 'application/pdf'
+    ) {
+      this.logger.warn(
+        `Attempted to generate preview for non-PDF document: ${id} (type: ${document.fileType})`,
+      );
       throw new BadRequestException(
-        'Only PDF documents can have previews generated',
+        `Only PDF documents can have previews generated (found: ${document.fileType})`,
       );
     }
 
