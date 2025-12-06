@@ -628,6 +628,40 @@ export class DocumentsService {
     }
   }
 
+  /**
+   * Get a secure preview URL for a document.
+   * Returns a short-lived signed S3 URL (15 minutes) for PDFs and other documents.
+   */
+  async getPreviewUrl(documentId: string): Promise<{
+    previewUrl: string;
+    fileType: string;
+    filename: string;
+    pageCount?: number;
+  }> {
+    const document = await this.documentsRepository.findById(documentId);
+    if (!document) {
+      throw new NotFoundException('Document not found');
+    }
+
+    if (!document.s3Key) {
+      throw new NotFoundException('Document file not found in storage');
+    }
+
+    // Generate short-lived signed URL (15 minutes)
+    const previewUrl = await this.s3Service.getSignedUrl(document.s3Key, 900);
+
+    // Extract page count from metadata if available (for PDFs)
+    const metadata = document.metadata as Record<string, any> | undefined;
+    const pageCount = metadata?.pageCount;
+
+    return {
+      previewUrl,
+      fileType: document.fileType || 'unknown',
+      filename: document.originalFilename || document.filename,
+      pageCount: typeof pageCount === 'number' ? pageCount : undefined,
+    };
+  }
+
   toResponseDto(document: Document): DocumentResponseDto {
     // For PDFs, don't expose the S3 URL - force use of secure preview
     const isPdf = document.fileType?.toLowerCase().includes('pdf');

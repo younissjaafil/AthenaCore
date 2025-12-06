@@ -275,6 +275,35 @@ export class DocumentsController {
 
   // ===== GENERIC DOCUMENT ROUTES =====
 
+  @Get(':id/preview')
+  @Public()
+  @ApiOperation({
+    summary:
+      'Get a secure preview URL for a document (returns fresh signed S3 URL)',
+  })
+  @ApiParam({ name: 'id', description: 'Document ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Preview URL generated',
+    schema: {
+      type: 'object',
+      properties: {
+        previewUrl: { type: 'string', description: 'Signed S3 URL (15 min)' },
+        fileType: { type: 'string' },
+        filename: { type: 'string' },
+        pageCount: { type: 'number', nullable: true },
+      },
+    },
+  })
+  async getDocumentPreview(@Param('id') id: string): Promise<{
+    previewUrl: string;
+    fileType: string;
+    filename: string;
+    pageCount?: number;
+  }> {
+    return await this.documentsService.getPreviewUrl(id);
+  }
+
   @Get(':id')
   @UseGuards(ClerkAuthGuard)
   @ApiBearerAuth()
