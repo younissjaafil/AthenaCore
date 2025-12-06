@@ -363,7 +363,9 @@ export class DocumentsController {
     // If previews are missing but this is a PDF, generate on-demand
     if (!hasPreview) {
       if (!document.fileType?.includes('pdf')) {
-        throw new BadRequestException('Only PDF documents support page preview');
+        throw new BadRequestException(
+          'Only PDF documents support page preview',
+        );
       }
 
       const result = await this.pdfPreviewService.generateAllPreviews(
@@ -372,7 +374,9 @@ export class DocumentsController {
       );
 
       // Update stored page count metadata for future requests
-      await this.documentsService.updateMetadata(id, { pageCount: result.pageCount });
+      await this.documentsService.updateMetadata(id, {
+        pageCount: result.pageCount,
+      });
       hasPreview = result.pageCount > 0;
     }
 
