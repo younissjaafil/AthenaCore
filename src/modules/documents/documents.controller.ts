@@ -275,55 +275,8 @@ export class DocumentsController {
     );
   }
 
-  @Get(':id')
-  @UseGuards(ClerkAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get document details' })
-  @ApiResponse({
-    status: 200,
-    description: 'Document found',
-    type: DocumentResponseDto,
-  })
-  async getDocument(@Param('id') id: string): Promise<DocumentResponseDto> {
-    return this.documentsService.findOne(id);
-  }
-
-  @Patch(':id')
-  @UseGuards(ClerkAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({
-    summary: 'Update document properties (visibility, title, etc)',
-  })
-  @ApiParam({ name: 'id', description: 'Document ID' })
-  @ApiResponse({
-    status: 200,
-    description: 'Document updated successfully',
-    type: DocumentResponseDto,
-  })
-  async updateDocument(
-    @Param('id') id: string,
-    @Body() updateDto: UpdateDocumentDto,
-    @CurrentUser() user: User,
-  ): Promise<DocumentResponseDto> {
-    return this.documentsService.updateDocument(id, user.id, updateDto);
-  }
-
-  @Delete(':id')
-  @UseGuards(ClerkAuthGuard)
-  @ApiBearerAuth()
-  @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Delete document (admins can delete any document)' })
-  @ApiResponse({ status: 204, description: 'Document deleted' })
-  async deleteDocument(
-    @Param('id') id: string,
-    @CurrentUser() user: User,
-  ): Promise<void> {
-    // User ID is used as creator ID to verify ownership via agent
-    // Admins can delete any document
-    await this.documentsService.deleteDocument(id, user.id, user.roles || []);
-  }
-
   // ===== PDF PREVIEW ENDPOINTS =====
+  // IMPORTANT: These must come BEFORE @Get(':id') to avoid route conflicts
 
   @Get(':id/preview/info')
   @Public()
@@ -346,10 +299,15 @@ export class DocumentsController {
     hasPreviewsGenerated: boolean;
     previewAvailable: boolean;
   }> {
+    if (!this.pdfPreviewService) {
+      throw new BadRequestException('PDF preview service not available');
+    }
+
     const document = await this.documentsService.findById(id);
     const hasPreviewsGenerated =
       await this.pdfPreviewService.hasPreviewsGenerated(id);
-    const pageCount = document.metadata?.pageCount || 0;
+    const pageCount: number =
+      (document.metadata && (document.metadata.pageCount as number)) || 0;
 
     return {
       pageCount,
@@ -414,6 +372,7 @@ export class DocumentsController {
   })
   async generatePreviews(
     @Param('id') id: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     @CurrentUser() user: User,
   ): Promise<{ pageCount: number; message: string }> {
     const document = await this.documentsService.findById(id);
@@ -440,6 +399,57 @@ export class DocumentsController {
       pageCount: result.pageCount,
       message: `Generated ${result.pageCount} watermarked preview pages`,
     };
+  }
+
+  // ===== GENERIC DOCUMENT ROUTES =====
+  // These come AFTER preview routes to avoid route conflicts
+
+  @Get(':id')
+  @UseGuards(ClerkAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get document details' })
+  @ApiResponse({
+    status: 200,
+    description: 'Document found',
+    type: DocumentResponseDto,
+  })
+  async getDocument(@Param('id') id: string): Promise<DocumentResponseDto> {
+    return this.documentsService.findOne(id);
+  }
+
+  @Patch(':id')
+  @UseGuards(ClerkAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Update document properties (visibility, title, etc)',
+  })
+  @ApiParam({ name: 'id', description: 'Document ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Document updated successfully',
+    type: DocumentResponseDto,
+  })
+  async updateDocument(
+    @Param('id') id: string,
+    @Body() updateDto: UpdateDocumentDto,
+    @CurrentUser() user: User,
+  ): Promise<DocumentResponseDto> {
+    return this.documentsService.updateDocument(id, user.id, updateDto);
+  }
+
+  @Delete(':id')
+  @UseGuards(ClerkAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete document (admins can delete any document)' })
+  @ApiResponse({ status: 204, description: 'Document deleted' })
+  async deleteDocument(
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+  ): Promise<void> {
+    // User ID is used as creator ID to verify ownership via agent
+    // Admins can delete any document
+    await this.documentsService.deleteDocument(id, user.id, user.roles || []);
   }
 
   @Post(':id/reprocess')
