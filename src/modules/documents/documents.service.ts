@@ -674,7 +674,7 @@ export class DocumentsService {
   toResponseDto(document: Document): DocumentResponseDto {
     // For PDFs, don't expose the S3 URL - force use of secure preview
     const isPdf = document.fileType?.toLowerCase().includes('pdf');
-    
+
     return {
       id: document.id,
       // Ownership
@@ -719,7 +719,7 @@ export class DocumentsService {
     const metadata = document.metadata as Record<string, any> | undefined;
     // For PDFs, don't expose the S3 URL - force use of secure preview
     const isPdf = document.fileType?.toLowerCase().includes('pdf');
-    
+
     return {
       id: document.id,
       filename: document.filename,
@@ -751,10 +751,12 @@ export class DocumentsService {
     document: Document,
   ): Promise<PublicDocumentResponseDto> {
     const metadata = document.metadata as Record<string, any> | undefined;
-    
+
     // For PDFs, don't expose the S3 URL - force use of secure preview
     const isPdf = document.fileType?.toLowerCase().includes('pdf');
-    const signedUrl = isPdf ? undefined : await this.getSignedS3Url(document.s3Key);
+    const signedUrl = isPdf
+      ? undefined
+      : await this.getSignedS3Url(document.s3Key);
 
     return {
       id: document.id,
