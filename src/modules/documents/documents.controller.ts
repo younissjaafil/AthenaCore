@@ -302,8 +302,16 @@ export class DocumentsController {
     hasPreviewsGenerated: boolean;
     previewAvailable: boolean;
   }> {
-    if (!this.pdfPreviewService) {
-      throw new BadRequestException('PDF preview service not available');
+    // Check if PDF preview service is available on this server
+    const previewAvailable = this.pdfPreviewService?.isAvailable() ?? false;
+
+    // If preview not available, return graceful response instead of error
+    if (!previewAvailable) {
+      return {
+        pageCount: 0,
+        hasPreviewsGenerated: false,
+        previewAvailable: false,
+      };
     }
 
     const document = await this.documentsService.findById(id);
@@ -315,7 +323,7 @@ export class DocumentsController {
     return {
       pageCount,
       hasPreviewsGenerated,
-      previewAvailable: this.pdfPreviewService.isAvailable(),
+      previewAvailable: true,
     };
   }
 
@@ -339,6 +347,13 @@ export class DocumentsController {
     @Param('id') id: string,
     @Param('page', ParseIntPipe) page: number,
   ): Promise<{ url: string; expiresIn: number }> {
+    // Check if PDF preview service is available
+    if (!this.pdfPreviewService?.isAvailable()) {
+      throw new NotFoundException(
+        'PDF preview is not available on this server. The server may not have the required dependencies (poppler-utils, sharp).',
+      );
+    }
+
     // Verify document exists
     await this.documentsService.findById(id);
 
