@@ -16,6 +16,7 @@ async function bootstrap() {
   app.enableCors({
     origin: [
       'http://localhost:4000',
+      'http://192.168.10.153:4000', // Local network access
       'https://athena-front-beta.vercel.app',
       'https://athena-ai.pro',
       'https://www.athena-ai.pro',
@@ -69,9 +70,12 @@ async function bootstrap() {
   SwaggerModule.setup('docs', app, document);
 
   const port = process.env.PORT ?? 3000;
-  await app.listen(port);
+  await app.listen(port, '0.0.0.0'); // Listen on all network interfaces
 
-  console.log(`🚀 Athena API is running on: http://localhost:${port}/api`);
+  console.log(`🚀 Athena API is running on:`);
+  console.log(`   - Local:   http://localhost:${port}/api`);
+  console.log(`   - Network: http://192.168.10.153:${port}/api`);
   console.log(`📚 Swagger documentation: http://localhost:${port}/docs`);
 }
-bootstrap();
+
+void bootstrap();

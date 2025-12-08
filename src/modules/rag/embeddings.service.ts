@@ -180,18 +180,37 @@ export class EmbeddingsService {
       );
 
       try {
+        // Filter out empty or invalid chunks
+        const validChunks = batch.filter(
+          (chunk) => chunk.content && chunk.content.trim().length > 0,
+        );
+
+        if (validChunks.length === 0) {
+          this.logger.warn(
+            `Batch ${i / batchSize + 1} has no valid chunks, skipping`,
+          );
+          continue;
+        }
+
+        // Sanitize input: remove null bytes and control characters
+        const sanitizedInputs = validChunks.map((chunk) =>
+          chunk.content
+            .replace(/\x00/g, '')
+            .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, ''),
+        );
+
         // Generate embeddings
         const response = await this.openai.embeddings.create({
           model: this.embeddingModel,
-          input: batch.map((chunk) => chunk.content),
+          input: sanitizedInputs,
           encoding_format: 'float',
         });
 
-        // Save to database
-        const embeddingsData = batch.map((chunk, idx) => ({
+        // Save to database (use original chunks for indices)
+        const embeddingsData = validChunks.map((chunk, idx) => ({
           agentId,
           documentId,
-          chunkIndex: i + idx,
+          chunkIndex: i + batch.indexOf(chunk),
           content: chunk.content,
           tokenCount: chunk.tokenCount,
           startPosition: chunk.startPosition,
