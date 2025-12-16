@@ -13,6 +13,7 @@ export type RagFeedback = 'up' | 'down';
 
 export interface RagCitation {
   documentId: string;
+  documentName?: string;
   chunkIndex: number;
   snippet: string;
   similarity: number;

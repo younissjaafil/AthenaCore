@@ -10,6 +10,7 @@ export interface SearchResult {
   id: string;
   agentId: string;
   documentId: string;
+  documentName?: string; // Added for better display
   chunkIndex: number;
   content: string;
   similarity: number;
@@ -88,18 +89,27 @@ export class VectorSearchService {
       threshold,
     );
 
-    // Map results
-    const searchResults: SearchResult[] = results.map((result) => ({
-      id: result.embedding.id,
-      agentId: result.embedding.agentId,
-      documentId: result.embedding.documentId,
-      chunkIndex: result.embedding.chunkIndex,
-      content: result.embedding.content,
-      similarity: result.similarity,
-      metadata: result.embedding.metadata,
-      tokenCount: result.embedding.tokenCount,
-      createdAt: result.embedding.createdAt,
-    }));
+    // Map results with document names
+    const searchResults: SearchResult[] = results.map((result) => {
+      // Get document name from the document relation or metadata
+      const documentName =
+        result.embedding.document?.filename ||
+        result.embedding.metadata?.documentTitle ||
+        `Document ${result.embedding.chunkIndex + 1}`;
+
+      return {
+        id: result.embedding.id,
+        agentId: result.embedding.agentId,
+        documentId: result.embedding.documentId,
+        documentName,
+        chunkIndex: result.embedding.chunkIndex,
+        content: result.embedding.content,
+        similarity: result.similarity,
+        metadata: result.embedding.metadata,
+        tokenCount: result.embedding.tokenCount,
+        createdAt: result.embedding.createdAt,
+      };
+    });
 
     // Cache results
     await this.cacheManager.set(cacheKey, searchResults, this.cacheTTL);
@@ -192,17 +202,21 @@ export class VectorSearchService {
       orderedResults = [...results].sort((a, b) => b.similarity - a.similarity);
     }
 
-    // Build context with token budget
+    // Build context with token budget and better formatting
     let context = '';
     let contextTokenCount = 0;
+    let sourceNum = 1;
 
     for (const result of orderedResults) {
       if (contextTokenCount + result.tokenCount > config.ragMaxTokens) {
         break;
       }
 
-      context += `\n\n[Source: ${result.metadata?.heading || 'Document'} | sim=${(result.similarity * 100).toFixed(1)}%]\n${result.content}`;
+      // Build a clear source label with document name, section, and relevance
+      const sourceLabel = this.buildSourceLabel(result, sourceNum);
+      context += `\n\n${sourceLabel}\n${result.content}`;
       contextTokenCount += result.tokenCount;
+      sourceNum++;
     }
 
     const citations = this.buildCitations(orderedResults);
@@ -222,11 +236,41 @@ export class VectorSearchService {
   }
 
   /**
-   * Build citations from search results
+   * Build a descriptive source label for context
+   */
+  private buildSourceLabel(result: SearchResult, sourceNum: number): string {
+    const parts: string[] = [];
+
+    // Document name
+    const docName =
+      result.documentName || result.metadata?.documentTitle || 'Document';
+    parts.push(docName);
+
+    // Section/heading if available
+    if (result.metadata?.heading) {
+      parts.push(`§ ${result.metadata.heading}`);
+    } else if (result.metadata?.section) {
+      parts.push(`§ ${result.metadata.section}`);
+    }
+
+    // Content type hint
+    if (result.metadata?.contentType) {
+      parts.push(`[${result.metadata.contentType}]`);
+    }
+
+    // Relevance score
+    const relevance = (result.similarity * 100).toFixed(0);
+
+    return `--- [Source #${sourceNum}: ${parts.join(' > ')}] (${relevance}% relevance) ---`;
+  }
+
+  /**
+   * Build citations from search results with document names
    */
   private buildCitations(results: SearchResult[]): RagCitation[] {
     return results.map((r) => ({
       documentId: r.documentId,
+      documentName: r.documentName,
       chunkIndex: r.chunkIndex,
       snippet: r.content.slice(0, 500),
       similarity: r.similarity,

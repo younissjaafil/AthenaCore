@@ -385,9 +385,10 @@ export class ConversationsService {
         contextTokenCount = searchResult.contextTokenCount;
         citations = searchResult.citations;
 
-        // Store source references
+        // Store source references with document names for frontend display
         ragSources = searchResult.results.map((result) => ({
           documentId: result.documentId,
+          documentName: result.documentName || result.metadata?.documentTitle || 'Document',
           chunkIndex: result.chunkIndex,
           similarity: result.similarity,
         }));
@@ -560,14 +561,30 @@ export class ConversationsService {
   }
 
   /**
-   * Build system prompt with RAG context
+   * Build system prompt with RAG context - enhanced for better document utilization
    */
   private buildSystemPrompt(agent: Agent, ragContext: string): string {
     let prompt =
       agent.systemPrompt || `You are ${agent.name}, a helpful AI assistant.`;
 
     if (ragContext) {
-      prompt += `\n\n## IMPORTANT: Knowledge Base Context\n\nYou have access to the following information from uploaded documents. Use ALL relevant information from this context to provide comprehensive, detailed answers. Include specific details, names, dates, skills, and experiences mentioned in the context.\n\n${ragContext}\n\n## Instructions\n- Prioritize information from the context above over your general knowledge\n- Include specific details and examples from the context\n- If the context contains relevant information, use it fully\n- Only say you don't have information if it's truly not in the context`;
+      prompt += `
+
+## 📚 KNOWLEDGE BASE CONTEXT
+
+The following excerpts are from uploaded documents in your knowledge base. Each source is labeled with its document name, section, and relevance score.
+
+${ragContext}
+
+## 📋 INSTRUCTIONS FOR USING THIS CONTEXT
+
+1. **PRIORITIZE document information** - Always prefer information from the sources above over your general knowledge
+2. **BE COMPREHENSIVE** - Include ALL relevant details from the context: names, dates, numbers, skills, qualifications, etc.
+3. **CITE your sources** - When answering, mention which document or section the information comes from (e.g., "According to [document name]...")
+4. **SYNTHESIZE multiple sources** - If information spans multiple sources, combine them coherently
+5. **ACKNOWLEDGE limitations** - If the context doesn't contain enough information to fully answer, say so clearly
+6. **PRESERVE specifics** - Don't paraphrase away important details; include exact figures, lists, and technical terms
+7. **MATCH the question scope** - If asked for specific details, provide them; if asked for summaries, synthesize appropriately`;
     }
 
     return prompt;

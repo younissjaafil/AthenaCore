@@ -14,6 +14,8 @@ interface ChunkMetadata {
   pageNumber?: number;
   language?: string;
   keywords?: string[];
+  contentType?: string; // 'code' | 'list' | 'table' | 'qa' | 'definition'
+  documentTitle?: string;
   [key: string]: any;
 }
 
@@ -30,8 +32,10 @@ export class EmbeddingsService {
   private readonly logger = new Logger(EmbeddingsService.name);
   private readonly openai: OpenAI;
   private readonly encoder;
-  private readonly maxTokensPerChunk = 512; // Optimal for text-embedding-3-small
-  private readonly chunkOverlap = 50; // Token overlap between chunks
+  // Optimized chunk sizes for better semantic coherence
+  private readonly maxTokensPerChunk = 400; // Smaller chunks = more precise retrieval
+  private readonly minTokensPerChunk = 100; // Avoid tiny chunks
+  private readonly chunkOverlap = 75; // More overlap = better context preservation
   private readonly embeddingModel = 'text-embedding-3-small';
 
   constructor(
@@ -89,39 +93,220 @@ export class EmbeddingsService {
   }
 
   /**
-   * Chunk text into overlapping segments
+   * Chunk text into overlapping segments with semantic awareness
+   * Uses sentence boundaries and paragraph preservation for better context
    */
   private chunkText(text: string, metadata?: any): TextChunk[] {
     const chunks: TextChunk[] = [];
-    const tokens = this.encoder.encode(text);
+
+    // First, split by paragraphs (double newlines or markdown headers)
+    const paragraphs = this.splitIntoParagraphs(text);
+
+    let currentChunk = '';
+    let currentTokenCount = 0;
+    let chunkStartPosition = 0;
     let position = 0;
 
-    while (position < tokens.length) {
-      const chunkTokens = tokens.slice(
-        position,
-        position + this.maxTokensPerChunk,
+    for (const paragraph of paragraphs) {
+      const paragraphTokens = this.encoder.encode(paragraph);
+      const paragraphTokenCount = paragraphTokens.length;
+
+      // If single paragraph exceeds max, split by sentences
+      if (paragraphTokenCount > this.maxTokensPerChunk) {
+        // Save current chunk if not empty
+        if (currentChunk.trim()) {
+          chunks.push(
+            this.createChunk(
+              currentChunk.trim(),
+              currentTokenCount,
+              chunkStartPosition,
+              position,
+              metadata,
+            ),
+          );
+        }
+
+        // Split long paragraph by sentences
+        const sentenceChunks = this.splitLongParagraphBySentences(
+          paragraph,
+          position,
+          metadata,
+        );
+        chunks.push(...sentenceChunks);
+
+        position += paragraphTokenCount;
+        currentChunk = '';
+        currentTokenCount = 0;
+        chunkStartPosition = position;
+        continue;
+      }
+
+      // Check if adding this paragraph would exceed max tokens
+      if (currentTokenCount + paragraphTokenCount > this.maxTokensPerChunk) {
+        // Save current chunk and start new one
+        if (currentChunk.trim()) {
+          chunks.push(
+            this.createChunk(
+              currentChunk.trim(),
+              currentTokenCount,
+              chunkStartPosition,
+              position,
+              metadata,
+            ),
+          );
+        }
+
+        // Start new chunk with overlap (include last part of previous chunk)
+        const overlapText = this.getOverlapText(currentChunk);
+        currentChunk = overlapText + paragraph + '\n\n';
+        currentTokenCount = this.encoder.encode(currentChunk).length;
+        chunkStartPosition = position - this.encoder.encode(overlapText).length;
+      } else {
+        // Add paragraph to current chunk
+        currentChunk += paragraph + '\n\n';
+        currentTokenCount += paragraphTokenCount + 2; // +2 for newlines
+      }
+
+      position += paragraphTokenCount;
+    }
+
+    // Don't forget the last chunk
+    if (currentChunk.trim() && currentTokenCount >= this.minTokensPerChunk) {
+      chunks.push(
+        this.createChunk(
+          currentChunk.trim(),
+          currentTokenCount,
+          chunkStartPosition,
+          position,
+          metadata,
+        ),
       );
-      // decode returns Uint8Array, convert to string
-      const decoded = this.encoder.decode(chunkTokens);
-      const chunkText = new TextDecoder().decode(decoded);
-
-      chunks.push({
-        content: chunkText.trim(),
-        tokenCount: chunkTokens.length,
-        startPosition: position,
-        endPosition: position + chunkTokens.length,
-        metadata: this.extractChunkMetadata(chunkText, metadata),
-      });
-
-      // Move forward with overlap
-      position += this.maxTokensPerChunk - this.chunkOverlap;
+    } else if (currentChunk.trim() && chunks.length > 0) {
+      // Append small remaining text to last chunk
+      const lastChunk = chunks[chunks.length - 1];
+      lastChunk.content += '\n\n' + currentChunk.trim();
+      lastChunk.tokenCount += currentTokenCount;
+      lastChunk.endPosition = position;
+    } else if (currentChunk.trim()) {
+      // Edge case: only one small chunk
+      chunks.push(
+        this.createChunk(
+          currentChunk.trim(),
+          currentTokenCount,
+          chunkStartPosition,
+          position,
+          metadata,
+        ),
+      );
     }
 
     return chunks;
   }
 
   /**
-   * Extract metadata for a chunk (detect headings, sections, etc.)
+   * Split text into paragraphs, preserving headers
+   */
+  private splitIntoParagraphs(text: string): string[] {
+    // Split by double newlines, markdown headers, or HR markers
+    const rawParagraphs = text.split(/\n\n+|(?=^#{1,6}\s)/m);
+    return rawParagraphs.map((p) => p.trim()).filter((p) => p.length > 0);
+  }
+
+  /**
+   * Split a long paragraph by sentence boundaries
+   */
+  private splitLongParagraphBySentences(
+    paragraph: string,
+    startPosition: number,
+    metadata?: any,
+  ): TextChunk[] {
+    const chunks: TextChunk[] = [];
+    // Sentence-ending patterns (handles abbreviations better)
+    const sentences = paragraph.match(/[^.!?]+[.!?]+[\s]*/g) || [paragraph];
+
+    let currentChunk = '';
+    let currentTokenCount = 0;
+    let chunkStartPos = startPosition;
+    let position = startPosition;
+
+    for (const sentence of sentences) {
+      const sentenceTokens = this.encoder.encode(sentence);
+      const sentenceTokenCount = sentenceTokens.length;
+
+      if (
+        currentTokenCount + sentenceTokenCount > this.maxTokensPerChunk &&
+        currentChunk.trim()
+      ) {
+        chunks.push(
+          this.createChunk(
+            currentChunk.trim(),
+            currentTokenCount,
+            chunkStartPos,
+            position,
+            metadata,
+          ),
+        );
+
+        currentChunk = sentence;
+        currentTokenCount = sentenceTokenCount;
+        chunkStartPos = position;
+      } else {
+        currentChunk += sentence;
+        currentTokenCount += sentenceTokenCount;
+      }
+
+      position += sentenceTokenCount;
+    }
+
+    if (currentChunk.trim()) {
+      chunks.push(
+        this.createChunk(
+          currentChunk.trim(),
+          currentTokenCount,
+          chunkStartPos,
+          position,
+          metadata,
+        ),
+      );
+    }
+
+    return chunks;
+  }
+
+  /**
+   * Get overlap text from the end of a chunk
+   */
+  private getOverlapText(text: string): string {
+    if (!text) return '';
+    const tokens = this.encoder.encode(text);
+    if (tokens.length <= this.chunkOverlap) return text;
+
+    const overlapTokens = tokens.slice(-this.chunkOverlap);
+    const decoded = this.encoder.decode(overlapTokens);
+    return new TextDecoder().decode(decoded);
+  }
+
+  /**
+   * Create a TextChunk object with metadata
+   */
+  private createChunk(
+    content: string,
+    tokenCount: number,
+    startPosition: number,
+    endPosition: number,
+    documentMetadata?: any,
+  ): TextChunk {
+    return {
+      content,
+      tokenCount,
+      startPosition,
+      endPosition,
+      metadata: this.extractChunkMetadata(content, documentMetadata),
+    };
+  }
+
+  /**
+   * Extract metadata for a chunk (detect headings, sections, semantic tags)
    */
   private extractChunkMetadata(
     chunkText: string,
@@ -129,20 +314,88 @@ export class EmbeddingsService {
   ): ChunkMetadata | undefined {
     const metadata: ChunkMetadata = {};
 
-    // Detect heading (line starting with # or all caps short line)
     const lines = chunkText.split('\n').filter((l) => l.trim());
+
+    // Detect heading with multiple patterns
     if (lines.length > 0) {
       const firstLine = lines[0].trim();
-      if (
-        firstLine.startsWith('#') ||
-        (firstLine === firstLine.toUpperCase() && firstLine.length < 50)
-      ) {
+      // Markdown headers
+      if (firstLine.startsWith('#')) {
         metadata.heading = firstLine.replace(/^#+\s*/, '');
+      }
+      // All caps headers (like PDF sections)
+      else if (
+        firstLine === firstLine.toUpperCase() &&
+        firstLine.length > 3 &&
+        firstLine.length < 80 &&
+        !firstLine.match(/^[\d\W]+$/)
+      ) {
+        metadata.heading = this.toTitleCase(firstLine);
+      }
+      // Title case headers (common in documents)
+      else if (this.looksLikeTitle(firstLine)) {
+        metadata.heading = firstLine;
       }
     }
 
-    // Extract simple keywords (words appearing multiple times)
-    const words = chunkText.toLowerCase().match(/\b\w{4,}\b/g) || [];
+    // Extract section from headings found anywhere in chunk
+    const headingMatch = chunkText.match(/^#{1,3}\s+(.+)$/m);
+    if (headingMatch && !metadata.heading) {
+      metadata.section = headingMatch[1].trim();
+    }
+
+    // Detect content type/topic hints
+    const contentType = this.detectContentType(chunkText);
+    if (contentType) {
+      metadata.contentType = contentType;
+    }
+
+    // Extract keywords using TF-IDF-like approach
+    const stopWords = new Set([
+      'that',
+      'this',
+      'with',
+      'from',
+      'have',
+      'been',
+      'were',
+      'they',
+      'their',
+      'which',
+      'would',
+      'could',
+      'should',
+      'about',
+      'when',
+      'what',
+      'where',
+      'there',
+      'these',
+      'those',
+      'other',
+      'some',
+      'such',
+      'only',
+      'also',
+      'into',
+      'over',
+      'your',
+      'more',
+      'will',
+      'than',
+      'then',
+      'them',
+      'very',
+      'just',
+      'being',
+      'here',
+    ]);
+    const words = chunkText
+      .toLowerCase()
+      .replace(/[^a-zA-Z\s]/g, ' ')
+      .split(/\s+/)
+      .filter((w) => w.length >= 4 && !stopWords.has(w));
+
     const wordCounts: Record<string, number> = {};
     words.forEach((word) => {
       wordCounts[word] = (wordCounts[word] || 0) + 1;
@@ -156,11 +409,72 @@ export class EmbeddingsService {
     // Include document metadata if available
     if (documentMetadata) {
       metadata.pageNumber = documentMetadata.pageNumber;
-      metadata.section = documentMetadata.section;
+      if (!metadata.section && documentMetadata.section) {
+        metadata.section = documentMetadata.section;
+      }
       metadata.language = documentMetadata.language;
+      metadata.documentTitle =
+        documentMetadata.filename || documentMetadata.title;
     }
 
     return Object.keys(metadata).length > 0 ? metadata : undefined;
+  }
+
+  /**
+   * Convert ALL CAPS text to Title Case
+   */
+  private toTitleCase(text: string): string {
+    return text.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+
+  /**
+   * Check if text looks like a title/heading
+   */
+  private looksLikeTitle(text: string): boolean {
+    // Short, ends without period, mostly capitalized words
+    if (text.length > 100 || text.endsWith('.')) return false;
+    const words = text.split(/\s+/);
+    if (words.length > 10) return false;
+    const capitalizedCount = words.filter((w) => /^[A-Z]/.test(w)).length;
+    return capitalizedCount >= words.length * 0.6;
+  }
+
+  /**
+   * Detect content type from chunk text
+   */
+  private detectContentType(text: string): string | undefined {
+    const lowerText = text.toLowerCase();
+
+    // Code detection
+    if (
+      text.match(
+        /```|function\s|const\s|import\s|class\s|def\s|if\s*\(|for\s*\(/,
+      )
+    ) {
+      return 'code';
+    }
+    // List detection
+    if (text.match(/^\s*[-•*]\s/m) || text.match(/^\s*\d+\.\s/m)) {
+      return 'list';
+    }
+    // Table detection
+    if (text.match(/\|.*\|.*\|/)) {
+      return 'table';
+    }
+    // Q&A / FAQ detection
+    if (
+      lowerText.includes('question:') ||
+      lowerText.includes('answer:') ||
+      text.match(/^Q:\s|^A:\s/m)
+    ) {
+      return 'qa';
+    }
+    // Definition detection
+    if (lowerText.match(/\bis defined as\b|\brefers to\b|\bmeans that\b/)) {
+      return 'definition';
+    }
+
+    return undefined;
   }
 
   /**
