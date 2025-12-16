@@ -9,18 +9,28 @@ import { ResendService } from './services/resend.service';
 import { EmailProcessor } from './processors/email.processor';
 import { UsersModule } from '../users/users.module';
 
+const redisEnabled = process.env.REDIS_ENABLED?.toLowerCase() !== 'false';
+
 @Module({
   imports: [
     TypeOrmModule.forFeature([Notification]),
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-    BullModule.registerQueue({
-      name: 'email-queue',
-    }),
+    ...(redisEnabled
+      ? [
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+          BullModule.registerQueue({
+            name: 'email-queue',
+          }),
+        ]
+      : []),
     ConfigModule,
     UsersModule,
   ],
   controllers: [NotificationsController],
-  providers: [NotificationsService, ResendService, EmailProcessor],
+  providers: [
+    NotificationsService,
+    ResendService,
+    ...(redisEnabled ? [EmailProcessor] : []),
+  ],
   exports: [NotificationsService],
 })
 export class NotificationsModule {}

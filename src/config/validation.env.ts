@@ -29,6 +29,10 @@ export class EnvironmentVariables {
 
   @IsString()
   @IsOptional()
+  REDIS_ENABLED?: string;
+
+  @IsString()
+  @IsOptional()
   S3_ACCESS_KEY?: string;
 
   @IsString()

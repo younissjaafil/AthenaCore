@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { InjectQueue } from '@nestjs/bullmq';
@@ -14,6 +14,7 @@ import { welcomeEmailTemplate } from './templates/welcome.template';
 import { paymentConfirmationTemplate } from './templates/payment-confirmation.template';
 import { sessionBookingTemplate } from './templates/session-booking.template';
 import { sessionReminderTemplate } from './templates/session-reminder.template';
+import { ResendService } from './services/resend.service';
 
 @Injectable()
 export class NotificationsService {
@@ -22,7 +23,10 @@ export class NotificationsService {
   constructor(
     @InjectRepository(Notification)
     private readonly notificationRepository: Repository<Notification>,
-    @InjectQueue('email-queue') private readonly emailQueue: Queue<EmailJob>,
+    @Optional()
+    @InjectQueue('email-queue')
+    private readonly emailQueue?: Queue<EmailJob>,
+    @Optional() private readonly resendService?: ResendService,
   ) {}
 
   async sendWelcomeEmail(
@@ -144,6 +148,56 @@ export class NotificationsService {
 
     const savedNotification =
       await this.notificationRepository.save(notification);
+
+    // If Redis/BullMQ is disabled, fallback to direct email sending when possible.
+    if (!this.emailQueue) {
+      if (!this.resendService) {
+        await this.notificationRepository.update(savedNotification.id, {
+          status: NotificationStatus.FAILED,
+          metadata: {
+            errorMessage:
+              'Email queue disabled and ResendService not available; skipping send',
+          },
+        });
+        this.logger.warn(
+          `Email queue disabled; skipped sending notification ${savedNotification.id}`,
+        );
+        return savedNotification;
+      }
+
+      const result = await this.resendService.sendEmail({
+        to: options.to,
+        subject: options.subject,
+        html: options.html,
+        text: options.text,
+      });
+
+      if (result.success) {
+        await this.notificationRepository.update(savedNotification.id, {
+          status: NotificationStatus.SENT,
+          sentAt: new Date(),
+          metadata: {
+            resendId: result.resendId,
+            deliveredAt: new Date().toISOString(),
+          },
+        });
+        this.logger.log(
+          `Sent email directly (no queue) for notification ${savedNotification.id}`,
+        );
+      } else {
+        await this.notificationRepository.update(savedNotification.id, {
+          status: NotificationStatus.FAILED,
+          metadata: {
+            errorMessage: result.error || 'Unknown error',
+          },
+        });
+        this.logger.error(
+          `Direct email send failed for notification ${savedNotification.id}: ${result.error || 'Unknown error'}`,
+        );
+      }
+
+      return savedNotification;
+    }
 
     const jobPriority = this.getJobPriority(
       options.priority || NotificationPriority.NORMAL,

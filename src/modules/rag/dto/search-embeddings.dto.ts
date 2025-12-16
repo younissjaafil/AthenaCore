@@ -24,10 +24,10 @@ export class SearchEmbeddingsDto {
 
   @ApiPropertyOptional({
     description: 'Minimum similarity threshold (0-1)',
-    default: 0.7,
+    default: 0.35,
     minimum: 0,
     maximum: 1,
   })
   @IsOptional()
-  threshold?: number = 0.7;
+  threshold?: number = 0.35;
 }

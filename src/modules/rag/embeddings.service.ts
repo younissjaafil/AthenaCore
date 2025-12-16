@@ -66,18 +66,39 @@ export class EmbeddingsService {
       throw new Error(`Document ${documentId} has no extracted text`);
     }
 
-    // Check if already processed
+    const documentTitle =
+      document.originalFilename ||
+      document.filename ||
+      document.metadata?.title;
+
+    // Check if already processed.
+    // IMPORTANT: We must ensure both Postgres rows AND Qdrant vectors exist.
+    // If Qdrant upsert failed after saving PG rows, retrying would otherwise be blocked.
     const existingCount =
       await this.embeddingsRepository.countByDocument(documentId);
     if (existingCount > 0) {
+      const vectorCount =
+        await this.embeddingsRepository.countVectorsByDocument(documentId);
+
+      if (vectorCount === existingCount) {
+        this.logger.log(
+          `Document ${documentId} already processed (embeddings=${existingCount}, vectors=${vectorCount})`,
+        );
+        return;
+      }
+
       this.logger.warn(
-        `Document ${documentId} already has ${existingCount} embeddings`,
+        `Document ${documentId} has inconsistent RAG state (embeddings=${existingCount}, vectors=${vectorCount}). Reprocessing now.`,
       );
-      return;
+      await this.embeddingsRepository.deleteByDocument(documentId);
     }
 
     // Chunk the document
-    const chunks = this.chunkText(document.extractedText, document.metadata);
+    // Include filename/title in metadata so queries that reference the document name can retrieve.
+    const chunks = this.chunkText(document.extractedText, {
+      ...(document.metadata || {}),
+      filename: documentTitle,
+    });
     this.logger.log(`Created ${chunks.length} chunks from document`);
 
     // Generate embeddings in batches
@@ -85,6 +106,7 @@ export class EmbeddingsService {
       document.agentId,
       documentId,
       chunks,
+      documentTitle,
     );
 
     this.logger.log(
@@ -477,6 +499,19 @@ export class EmbeddingsService {
     return undefined;
   }
 
+  private sanitizeEmbeddingInput(text: string): string {
+    // OpenAI embeddings input must not contain null bytes; also strip other ASCII control chars.
+    // Keep \t, \n, \r for readability.
+    let out = '';
+    for (let i = 0; i < text.length; i++) {
+      const code = text.charCodeAt(i);
+      if (code === 0) continue;
+      if (code < 32 && code !== 9 && code !== 10 && code !== 13) continue;
+      out += text[i];
+    }
+    return out;
+  }
+
   /**
    * Generate embeddings for chunks using OpenAI
    */
@@ -484,8 +519,11 @@ export class EmbeddingsService {
     agentId: string,
     documentId: string,
     chunks: TextChunk[],
+    documentTitle?: string,
   ): Promise<void> {
     const batchSize = 100; // OpenAI allows up to 2048 inputs per request
+
+    const titlePrefix = documentTitle ? `Document: ${documentTitle}\n\n` : '';
 
     for (let i = 0; i < chunks.length; i += batchSize) {
       const batch = chunks.slice(i, i + batchSize);
@@ -507,11 +545,10 @@ export class EmbeddingsService {
         }
 
         // Sanitize input: remove null bytes and control characters
-        const sanitizedInputs = validChunks.map((chunk) =>
-          chunk.content
-            .replace(/\x00/g, '')
-            .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, ''),
-        );
+        const sanitizedInputs = validChunks.map((chunk) => {
+          const contentForEmbedding = `${titlePrefix}${chunk.content}`;
+          return this.sanitizeEmbeddingInput(contentForEmbedding);
+        });
 
         // Generate embeddings
         const response = await this.openai.embeddings.create({
@@ -549,9 +586,11 @@ export class EmbeddingsService {
    */
   async generateQueryEmbedding(query: string): Promise<number[]> {
     try {
+      const sanitizedQuery = this.sanitizeEmbeddingInput(query).trim();
+
       const response = await this.openai.embeddings.create({
         model: this.embeddingModel,
-        input: query,
+        input: sanitizedQuery,
         encoding_format: 'float',
       });
 

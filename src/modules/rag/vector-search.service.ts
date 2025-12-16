@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument */
 import { Injectable, Logger, Inject } from '@nestjs/common';
 import type { Cache } from 'cache-manager';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
@@ -53,6 +53,9 @@ export class VectorSearchService {
   private readonly logger = new Logger(VectorSearchService.name);
   private readonly cacheKeyPrefix = 'vector_search';
   private readonly cacheTTL = 3600; // 1 hour in seconds
+
+  private readonly fallbackSearchThreshold = 0.35;
+  private readonly hardIdkSimilarityFloor = 0.25;
 
   constructor(
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
@@ -112,8 +115,16 @@ export class VectorSearchService {
     });
 
     // Cache results
-    await this.cacheManager.set(cacheKey, searchResults, this.cacheTTL);
-    this.logger.log(`RAG search: ${searchResults.length} chunks retrieved`);
+    // IMPORTANT: don't cache empty results.
+    // If a user searches before embeddings are processed (or while reprocessing),
+    // caching the miss makes RAG look "broken" for up to 1 hour.
+    if (searchResults.length > 0) {
+      await this.cacheManager.set(cacheKey, searchResults, this.cacheTTL);
+    }
+
+    this.logger.log(
+      `RAG search: ${searchResults.length} chunks retrieved (threshold=${threshold})`,
+    );
 
     return searchResults;
   }
@@ -126,7 +137,17 @@ export class VectorSearchService {
     query: string,
     maxTokens: number = 2000,
   ): Promise<string> {
-    const results = await this.search(agentId, query, 10, 0.6);
+    let results = await this.search(agentId, query, 10, 0.6);
+
+    // If threshold is too strict for the query, run a second pass with a lower threshold.
+    if (results.length === 0) {
+      results = await this.search(
+        agentId,
+        query,
+        10,
+        this.fallbackSearchThreshold,
+      );
+    }
 
     let context = '';
     let totalTokens = 0;
@@ -158,12 +179,27 @@ export class VectorSearchService {
     const t0 = Date.now();
 
     // Perform similarity search
-    const results = await this.search(
+    let results = await this.search(
       agentId,
       query,
       config.ragMaxResults,
       config.ragSimilarityThreshold,
     );
+
+    // Many real-world queries land below strict similarity thresholds.
+    // If the first pass returns nothing, fall back to a safer threshold so we can
+    // still compute guardrails based on maxSimilarity.
+    if (
+      results.length === 0 &&
+      config.ragSimilarityThreshold > this.fallbackSearchThreshold
+    ) {
+      results = await this.search(
+        agentId,
+        query,
+        config.ragMaxResults,
+        this.fallbackSearchThreshold,
+      );
+    }
 
     const retrievalMs = Date.now() - t0;
 
@@ -185,14 +221,18 @@ export class VectorSearchService {
       }
 
       if (maxSimilarity < config.ragMinConfidenceThreshold) {
-        return {
-          results,
-          citations: this.buildCitations(results),
-          context: '',
-          contextTokenCount: 0,
-          guardrail: { outcome: 'idk', reason: 'low_similarity' },
-          retrievalMs,
-        };
+        // Hard-stop only if similarity is extremely low.
+        // Otherwise, allow answering with retrieved context to avoid false "IDK".
+        if (maxSimilarity < this.hardIdkSimilarityFloor) {
+          return {
+            results,
+            citations: this.buildCitations(results),
+            context: '',
+            contextTokenCount: 0,
+            guardrail: { outcome: 'idk', reason: 'low_similarity' },
+            retrievalMs,
+          };
+        }
       }
     }
 
@@ -230,7 +270,11 @@ export class VectorSearchService {
       citations,
       context: context.trim(),
       contextTokenCount,
-      guardrail: { outcome: 'answered' },
+      guardrail:
+        config.ragEnableGuardrails &&
+        maxSimilarity < config.ragMinConfidenceThreshold
+          ? { outcome: 'answered', reason: 'low_similarity_allow' }
+          : { outcome: 'answered' },
       retrievalMs,
     };
   }

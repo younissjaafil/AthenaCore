@@ -17,13 +17,17 @@ export interface SendEmailOptions {
 @Injectable()
 export class ResendService {
   private readonly logger = new Logger(ResendService.name);
-  private resend: Resend;
+  private resend: Resend | null = null;
   private readonly fromEmail: string;
 
   constructor(private configService: ConfigService) {
     const apiKey = this.configService.get<string>('RESEND_API_KEY');
     if (!apiKey) {
-      throw new Error('RESEND_API_KEY is not configured');
+      this.logger.warn('RESEND_API_KEY is not configured; email sending disabled');
+      this.fromEmail =
+        this.configService.get<string>('RESEND_FROM_EMAIL') ||
+        'noreply@athena.ai';
+      return;
     }
 
     this.resend = new Resend(apiKey);
@@ -40,6 +44,13 @@ export class ResendService {
     error?: string;
   }> {
     try {
+      if (!this.resend) {
+        return {
+          success: false,
+          error: 'Resend not configured (missing RESEND_API_KEY)',
+        };
+      }
+
       const recipient = Array.isArray(options.to) ? options.to[0] : options.to;
 
       const { data, error } = await this.resend.emails.send({

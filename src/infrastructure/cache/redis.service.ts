@@ -24,6 +24,14 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
   async connect(): Promise<void> {
     try {
+      const redisEnabledRaw = process.env.REDIS_ENABLED;
+      const redisEnabled = redisEnabledRaw?.toLowerCase() !== 'false';
+
+      if (!redisEnabled) {
+        this.logger.warn('REDIS_ENABLED=false, caching disabled');
+        return;
+      }
+
       const redisUrl = this.configService.redisDb;
 
       if (!redisUrl) {
@@ -66,6 +74,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   async disconnect(): Promise<void> {
     if (this.client) {
       await this.client.quit();
+      this.client = null;
       this.logger.log('Redis disconnected');
     }
   }

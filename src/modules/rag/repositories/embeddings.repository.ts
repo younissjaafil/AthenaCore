@@ -32,19 +32,25 @@ export class EmbeddingsRepository {
 
     // Store vector in Qdrant
     if (data.vector) {
-      await this.qdrantService.upsertPoints([
-        {
-          id: saved.id,
-          vector: data.vector,
-          payload: {
-            agentId: saved.agentId,
-            documentId: saved.documentId,
-            chunkIndex: saved.chunkIndex,
-            content: saved.content,
-            tokenCount: saved.tokenCount,
+      try {
+        await this.qdrantService.upsertPoints([
+          {
+            id: saved.id,
+            vector: data.vector,
+            payload: {
+              agentId: saved.agentId,
+              documentId: saved.documentId,
+              chunkIndex: saved.chunkIndex,
+              content: saved.content,
+              tokenCount: saved.tokenCount,
+            },
           },
-        },
-      ]);
+        ]);
+      } catch (error) {
+        // If Qdrant write fails, rollback PG row so re-processing isn't blocked.
+        await this.repository.delete({ id: saved.id });
+        throw error;
+      }
     }
 
     return saved;
@@ -61,31 +67,44 @@ export class EmbeddingsRepository {
     const embeddings = this.repository.create(embeddingsWithIds);
     const saved = await this.repository.save(embeddings);
 
-    // Store vectors in Qdrant
-    const vectorPoints = saved
-      .map((embedding, idx) => {
-        const vector = data[idx].vector;
+    // Store vectors in Qdrant.
+    // IMPORTANT: Build vector points from the pre-id'd input, keyed by id.
+    // Do NOT rely on TypeORM's returned order matching the input order.
+    const vectorPoints = embeddingsWithIds
+      .map((input) => {
+        const vector = input.vector;
         if (!vector) return null;
+
         return {
-          id: embedding.id,
+          id: input.id as string,
           vector,
           payload: {
-            agentId: embedding.agentId,
-            documentId: embedding.documentId,
-            chunkIndex: embedding.chunkIndex,
-            content: embedding.content,
-            tokenCount: embedding.tokenCount,
+            agentId: input.agentId,
+            documentId: input.documentId,
+            chunkIndex: input.chunkIndex,
+            content: input.content,
+            tokenCount: input.tokenCount,
           },
         };
       })
       .filter((p): p is NonNullable<typeof p> => p !== null);
 
     if (vectorPoints.length > 0) {
-      await this.qdrantService.upsertPoints(vectorPoints);
-      this.logger.log(`Stored ${vectorPoints.length} vectors in Qdrant`);
+      try {
+        await this.qdrantService.upsertPoints(vectorPoints);
+        this.logger.log(`Stored ${vectorPoints.length} vectors in Qdrant`);
+      } catch (error) {
+        // Rollback PG rows so a retry can re-run cleanly.
+        await this.repository.delete(vectorPoints.map((p) => p.id));
+        throw error;
+      }
     }
 
     return saved;
+  }
+
+  async countVectorsByDocument(documentId: string): Promise<number> {
+    return this.qdrantService.countByDocument(documentId);
   }
 
   async findById(id: string): Promise<Embedding | null> {
