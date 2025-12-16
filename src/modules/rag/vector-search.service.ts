@@ -290,8 +290,14 @@ export class VectorSearchService {
    */
   async clearAllCache(): Promise<void> {
     try {
-      await this.cacheManager.reset();
-      this.logger.log('All RAG cache cleared from Redis');
+      // cache-manager v5+ uses store.reset() if available, otherwise log warning
+      const store = (this.cacheManager as any).store;
+      if (store && typeof store.reset === 'function') {
+        await store.reset();
+        this.logger.log('All RAG cache cleared from Redis');
+      } else {
+        this.logger.warn('Cache reset not supported by current cache store');
+      }
     } catch (error) {
       this.logger.warn(`Failed to clear cache: ${error}`);
     }
@@ -304,8 +310,13 @@ export class VectorSearchService {
     try {
       // cache-manager reset clears all - for agent-specific, we need Redis directly
       // For now, reset all cache as a simple solution
-      await this.cacheManager.reset();
-      this.logger.log(`Cache cleared for agent ${agentId} (full reset)`);
+      const store = (this.cacheManager as any).store;
+      if (store && typeof store.reset === 'function') {
+        await store.reset();
+        this.logger.log(`Cache cleared for agent ${agentId} (full reset)`);
+      } else {
+        this.logger.warn(`Cache reset not supported for agent ${agentId}`);
+      }
     } catch (error) {
       this.logger.warn(`Failed to clear agent cache: ${error}`);
     }

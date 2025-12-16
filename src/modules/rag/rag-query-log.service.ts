@@ -50,6 +50,9 @@ export interface AgentAnalytics {
   feedbackRate: number;
   queriesOverTime: { date: string; count: number }[];
   topIdkReasons: { reason: string; count: number }[];
+  // Cost metrics
+  totalTokens: number;
+  estimatedCostUsd: number;
 }
 
 @Injectable()
@@ -180,6 +183,13 @@ export class RagQueryLogService {
         ? feedbackUpCount / logsWithFeedback.length
         : 0;
 
+    // Calculate total tokens and estimated cost
+    const totalTokens = logs.reduce((sum, l) => sum + (l.totalTokensApprox || 0), 0);
+    // GPT-4o pricing: ~$2.50/1M input + $10/1M output tokens (avg ~$5/1M)
+    // GPT-4o-mini: ~$0.15/1M input + $0.60/1M output tokens (avg ~$0.30/1M)
+    // Using conservative estimate of $3/1M tokens for mixed usage
+    const estimatedCostUsd = (totalTokens / 1_000_000) * 3;
+
     // Group by date for chart
     const dateMap = new Map<string, number>();
     for (const log of logs) {
@@ -215,6 +225,8 @@ export class RagQueryLogService {
       feedbackRate,
       queriesOverTime,
       topIdkReasons,
+      totalTokens,
+      estimatedCostUsd,
     };
   }
 

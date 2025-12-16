@@ -64,6 +64,10 @@ export class ConversationsRepository {
     await this.repository.update(id, data);
   }
 
+  async delete(id: string): Promise<void> {
+    await this.repository.delete(id);
+  }
+
   async incrementMessageCount(id: string): Promise<void> {
     await this.repository.increment({ id }, 'totalMessages', 1);
   }

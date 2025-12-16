@@ -306,7 +306,7 @@ export class ConversationsService {
   }
 
   /**
-   * Delete a conversation (soft delete)
+   * Delete a conversation (hard delete)
    */
   async deleteConversation(
     userId: string,
@@ -327,9 +327,8 @@ export class ConversationsService {
       );
     }
 
-    await this.conversationsRepository.update(conversationId, {
-      status: ConversationStatus.DELETED,
-    });
+    // Delete the conversation (cascades to messages)
+    await this.conversationsRepository.delete(conversationId);
 
     // Invalidate cache
     await this.cacheService.invalidateConversationCache(conversationId, userId);
