@@ -29,7 +29,7 @@ import {
   AgentStatsDto,
 } from './dto/system-stats.dto';
 import { AdminActionResponseDto } from './dto/admin-response.dto';
-import { UpdateUserRoleDto, DeactivateUserDto } from './dto/update-user.dto';
+import { UpdateUserRoleDto } from './dto/update-user.dto';
 
 @ApiTags('Admin')
 @Controller('admin')
@@ -48,16 +48,19 @@ export class AdminController {
     status: 403,
     description: 'User is not admin',
   })
-  async checkAdmin(@CurrentUser() user: any): Promise<any> {
-    // This will throw if user is not admin
+  checkAdmin(@CurrentUser() user: any): any {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     if (!user.isAdmin) {
       throw new ForbiddenException('Not authorized as admin');
     }
     return {
       isAdmin: true,
       user: {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
         id: user.id,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
         email: user.email,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
         fullName: user.fullName,
       },
     };
@@ -220,12 +223,8 @@ export class AdminController {
   })
   async deactivateUser(
     @Param('userId') userId: string,
-    @Body() deactivateDto: DeactivateUserDto,
   ): Promise<AdminActionResponseDto> {
-    const result = await this.adminService.deactivateUser(
-      userId,
-      deactivateDto.reason,
-    );
+    const result = await this.adminService.deactivateUser(userId);
     return {
       success: result.success,
       message: result.message,
@@ -272,8 +271,16 @@ export class AdminController {
   @UseGuards(ClerkAuthGuard, RolesGuard)
   @Roles('admin')
   @ApiOperation({ summary: 'Get RAG query logs for analytics' })
-  @ApiQuery({ name: 'agentId', required: false, description: 'Filter by agent ID' })
-  @ApiQuery({ name: 'limit', required: false, description: 'Number of logs to return (default: 50)' })
+  @ApiQuery({
+    name: 'agentId',
+    required: false,
+    description: 'Filter by agent ID',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Number of logs to return (default: 50)',
+  })
   @ApiResponse({
     status: 200,
     description: 'RAG logs retrieved successfully',
@@ -282,7 +289,7 @@ export class AdminController {
     @Query('agentId') agentId?: string,
     @Query('limit') limit?: number,
   ): Promise<any> {
-    return this.adminService.getRagLogs(agentId, limit || 50);
+    return await this.adminService.getRagLogs(agentId, limit || 50);
   }
 
   @Get('rag-logs/:agentId/stats')
@@ -294,6 +301,6 @@ export class AdminController {
     description: 'RAG statistics retrieved successfully',
   })
   async getRagStats(@Param('agentId') agentId: string): Promise<any> {
-    return this.adminService.getRagStats(agentId);
+    return await this.adminService.getRagStats(agentId);
   }
 }

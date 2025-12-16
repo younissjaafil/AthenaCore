@@ -13,7 +13,7 @@ import { CreatorsModule } from '../creators/creators.module';
 @Module({
   imports: [
     TypeOrmModule.forFeature([Document]),
-    AgentsModule,
+    forwardRef(() => AgentsModule),
     S3Module,
     UsersModule,
     forwardRef(() => RagModule),

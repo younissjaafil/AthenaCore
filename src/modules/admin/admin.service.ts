@@ -265,7 +265,6 @@ export class AdminService {
 
   async deactivateUser(
     userId: string,
-    reason?: string,
   ): Promise<{ success: boolean; message: string }> {
     const user = await this.userRepository.findOne({
       where: { clerkId: userId },
@@ -407,15 +406,24 @@ export class AdminService {
     }
 
     const totalQueries = logs.length;
-    const answeredQueries = logs.filter((log) => log.outcome === 'answered').length;
+    const answeredQueries = logs.filter(
+      (log) => log.outcome === 'answered',
+    ).length;
     const idkQueries = logs.filter((log) => log.outcome === 'idk').length;
-    const avgLatency = logs.reduce((sum, log) => sum + (log.latencyMs || 0), 0) / totalQueries;
-    const avgRetrievalMs = logs.reduce((sum, log) => sum + (log.retrievalMs || 0), 0) / totalQueries;
-    const avgOpenaiMs = logs.reduce((sum, log) => sum + (log.openaiMs || 0), 0) / totalQueries;
-    const avgTokens = logs.reduce((sum, log) => sum + (log.totalTokensApprox || 0), 0) / totalQueries;
-    const avgSimilarity = logs
-      .filter((log) => log.maxSimilarity !== null)
-      .reduce((sum, log) => sum + (log.maxSimilarity || 0), 0) / logs.filter((log) => log.maxSimilarity !== null).length;
+    const avgLatency =
+      logs.reduce((sum, log) => sum + (log.latencyMs || 0), 0) / totalQueries;
+    const avgRetrievalMs =
+      logs.reduce((sum, log) => sum + (log.retrievalMs || 0), 0) / totalQueries;
+    const avgOpenaiMs =
+      logs.reduce((sum, log) => sum + (log.openaiMs || 0), 0) / totalQueries;
+    const avgTokens =
+      logs.reduce((sum, log) => sum + (log.totalTokensApprox || 0), 0) /
+      totalQueries;
+    const avgSimilarity =
+      logs
+        .filter((log) => log.maxSimilarity !== null)
+        .reduce((sum, log) => sum + (log.maxSimilarity || 0), 0) /
+      logs.filter((log) => log.maxSimilarity !== null).length;
 
     return {
       agentId,
