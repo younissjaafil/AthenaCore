@@ -221,4 +221,14 @@ export class RagQueryLogService {
   async getLogById(id: string): Promise<RagQueryLog | null> {
     return this.repo.findOne({ where: { id } });
   }
+
+  /**
+   * Reset (delete) all analytics logs for an agent
+   */
+  async resetAnalytics(agentId: string): Promise<{ deletedCount: number }> {
+    const result = await this.repo.delete({ agentId });
+    const deletedCount = result.affected || 0;
+    this.logger.log(`Analytics reset for agent ${agentId}: ${deletedCount} logs deleted`);
+    return { deletedCount };
+  }
 }

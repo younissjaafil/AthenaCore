@@ -83,6 +83,24 @@ export class AgentAnalyticsController {
     );
   }
 
+  @Post(':id/analytics/reset')
+  @UseGuards(ClerkAuthGuard, RolesGuard)
+  @Roles('creator', 'admin')
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Reset all analytics data for an agent (Creator only)' })
+  @ApiResponse({ status: 200, description: 'Analytics reset successfully' })
+  @ApiResponse({ status: 403, description: 'Not authorized to reset this agent' })
+  @ApiResponse({ status: 404, description: 'Agent not found' })
+  async resetAnalytics(
+    @Param('id') agentId: string,
+    @CurrentUser() user: User,
+  ): Promise<{ success: boolean; deletedCount: number }> {
+    await this.verifyAgentOwnership(agentId, user);
+    const result = await this.ragQueryLogService.resetAnalytics(agentId);
+    return { success: true, deletedCount: result.deletedCount };
+  }
+
   @Post('logs/:logId/feedback')
   @UseGuards(ClerkAuthGuard)
   @ApiBearerAuth()

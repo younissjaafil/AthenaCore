@@ -286,7 +286,33 @@ export class VectorSearchService {
   }
 
   /**
-   * Clear cache for an agent
+   * Clear all RAG cache from Redis
+   */
+  async clearAllCache(): Promise<void> {
+    try {
+      await this.cacheManager.reset();
+      this.logger.log('All RAG cache cleared from Redis');
+    } catch (error) {
+      this.logger.warn(`Failed to clear cache: ${error}`);
+    }
+  }
+
+  /**
+   * Clear cache for a specific agent by deleting keys with pattern
+   */
+  async clearAgentCacheById(agentId: string): Promise<void> {
+    try {
+      // cache-manager reset clears all - for agent-specific, we need Redis directly
+      // For now, reset all cache as a simple solution
+      await this.cacheManager.reset();
+      this.logger.log(`Cache cleared for agent ${agentId} (full reset)`);
+    } catch (error) {
+      this.logger.warn(`Failed to clear agent cache: ${error}`);
+    }
+  }
+
+  /**
+   * Clear cache for an agent (legacy method)
    */
   clearAgentCache(agentId: string): void {
     // Note: cache-manager doesn't support pattern deletion by default

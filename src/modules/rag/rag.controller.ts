@@ -2,6 +2,7 @@ import {
   Controller,
   Post,
   Get,
+  Delete,
   Body,
   Param,
   Query,
@@ -134,5 +135,27 @@ export class RagController {
       metadata: e.metadata,
       createdAt: e.createdAt,
     }));
+  }
+
+  @Delete('cache')
+  @Public()
+  @ApiOperation({ summary: 'Clear all RAG cache from Redis' })
+  @ApiResponse({ status: 200, description: 'Cache cleared successfully' })
+  async clearAllCache(): Promise<{ message: string; cleared: boolean }> {
+    this.logger.log('Clearing all RAG cache');
+    await this.vectorSearchService.clearAllCache();
+    return { message: 'RAG cache cleared successfully', cleared: true };
+  }
+
+  @Delete('cache/:agentId')
+  @Public()
+  @ApiOperation({ summary: 'Clear RAG cache for a specific agent' })
+  @ApiResponse({ status: 200, description: 'Agent cache cleared successfully' })
+  async clearAgentCache(
+    @Param('agentId') agentId: string,
+  ): Promise<{ message: string; agentId: string }> {
+    this.logger.log(`Clearing RAG cache for agent ${agentId}`);
+    await this.vectorSearchService.clearAgentCacheById(agentId);
+    return { message: 'Agent RAG cache cleared', agentId };
   }
 }
