@@ -250,6 +250,8 @@ export class AdminController {
   }
 
   @Delete('agents/:agentId')
+  @UseGuards(ClerkAuthGuard, RolesGuard)
+  @Roles('admin')
   @ApiOperation({ summary: 'Delete an agent (soft delete)' })
   @ApiResponse({
     status: 200,
@@ -264,5 +266,34 @@ export class AdminController {
       success: result.success,
       message: result.message,
     };
+  }
+
+  @Get('rag-logs')
+  @UseGuards(ClerkAuthGuard, RolesGuard)
+  @Roles('admin')
+  @ApiOperation({ summary: 'Get RAG query logs for analytics' })
+  @ApiQuery({ name: 'agentId', required: false, description: 'Filter by agent ID' })
+  @ApiQuery({ name: 'limit', required: false, description: 'Number of logs to return (default: 50)' })
+  @ApiResponse({
+    status: 200,
+    description: 'RAG logs retrieved successfully',
+  })
+  async getRagLogs(
+    @Query('agentId') agentId?: string,
+    @Query('limit') limit?: number,
+  ): Promise<any> {
+    return this.adminService.getRagLogs(agentId, limit || 50);
+  }
+
+  @Get('rag-logs/:agentId/stats')
+  @UseGuards(ClerkAuthGuard, RolesGuard)
+  @Roles('admin')
+  @ApiOperation({ summary: 'Get RAG statistics for a specific agent' })
+  @ApiResponse({
+    status: 200,
+    description: 'RAG statistics retrieved successfully',
+  })
+  async getRagStats(@Param('agentId') agentId: string): Promise<any> {
+    return this.adminService.getRagStats(agentId);
   }
 }

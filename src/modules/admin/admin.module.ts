@@ -13,6 +13,7 @@ import { Session } from '../sessions/entities/session.entity';
 import { Transaction } from '../payments/entities/transaction.entity';
 import { Entitlement } from '../payments/entities/entitlement.entity';
 import { Embedding } from '../rag/entities/embedding.entity';
+import { RagQueryLog } from '../rag/entities/rag-query-log.entity';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { Embedding } from '../rag/entities/embedding.entity';
       Transaction,
       Entitlement,
       Embedding,
+      RagQueryLog,
     ]),
   ],
   controllers: [AdminController],

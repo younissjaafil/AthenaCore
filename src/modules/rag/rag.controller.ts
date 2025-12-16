@@ -40,7 +40,7 @@ export class RagController {
   @ApiResponse({ status: 404, description: 'Document not found' })
   async processDocument(
     @Param('documentId') documentId: string,
-    @CurrentUser('userId') userId: string,
+    @CurrentUser('sub') userId: string,
   ): Promise<{ message: string; chunksCreated: number }> {
     this.logger.log(`Processing document ${documentId} for user ${userId}`);
 

@@ -13,6 +13,7 @@ import { Transaction } from '../payments/entities/transaction.entity';
 import { TransactionStatus } from '../payments/entities/transaction.entity';
 import { Entitlement } from '../payments/entities/entitlement.entity';
 import { Embedding } from '../rag/entities/embedding.entity';
+import { RagQueryLog } from '../rag/entities/rag-query-log.entity';
 import {
   SystemStatsDto,
   UserStatsDto,
@@ -44,6 +45,8 @@ export class AdminService {
     private readonly entitlementRepository: Repository<Entitlement>,
     @InjectRepository(Embedding)
     private readonly embeddingRepository: Repository<Embedding>,
+    @InjectRepository(RagQueryLog)
+    private readonly ragQueryLogRepository: Repository<RagQueryLog>,
   ) {}
 
   async getSystemStats(): Promise<SystemStatsDto> {
@@ -347,5 +350,90 @@ export class AdminService {
       order: { createdAt: 'DESC' },
       relations: ['creator', 'creator.user'],
     });
+  }
+
+  async getRagLogs(agentId?: string, limit = 50): Promise<any> {
+    const queryBuilder = this.ragQueryLogRepository
+      .createQueryBuilder('log')
+      .leftJoinAndSelect('log.agent', 'agent')
+      .orderBy('log.createdAt', 'DESC')
+      .take(limit);
+
+    if (agentId) {
+      queryBuilder.where('log.agentId = :agentId', { agentId });
+    }
+
+    const logs = await queryBuilder.getMany();
+
+    return {
+      total: logs.length,
+      logs: logs.map((log) => ({
+        id: log.id,
+        createdAt: log.createdAt,
+        userId: log.userId,
+        agentId: log.agentId,
+        agentName: log.agent?.name,
+        query: log.query,
+        topK: log.topK,
+        retrievedCount: log.retrievedCount,
+        maxSimilarity: log.maxSimilarity,
+        rerankUsed: log.rerankUsed,
+        latencyMs: log.latencyMs,
+        retrievalMs: log.retrievalMs,
+        openaiMs: log.openaiMs,
+        contextTokenCount: log.contextTokenCount,
+        model: log.model,
+        totalTokensApprox: log.totalTokensApprox,
+        outcome: log.outcome,
+        idkReason: log.idkReason,
+        citations: log.citations,
+        feedback: log.feedback,
+      })),
+    };
+  }
+
+  async getRagStats(agentId: string): Promise<any> {
+    const logs = await this.ragQueryLogRepository.find({
+      where: { agentId },
+      order: { createdAt: 'DESC' },
+    });
+
+    if (logs.length === 0) {
+      return {
+        agentId,
+        totalQueries: 0,
+        message: 'No RAG queries logged for this agent yet',
+      };
+    }
+
+    const totalQueries = logs.length;
+    const answeredQueries = logs.filter((log) => log.outcome === 'answered').length;
+    const idkQueries = logs.filter((log) => log.outcome === 'idk').length;
+    const avgLatency = logs.reduce((sum, log) => sum + (log.latencyMs || 0), 0) / totalQueries;
+    const avgRetrievalMs = logs.reduce((sum, log) => sum + (log.retrievalMs || 0), 0) / totalQueries;
+    const avgOpenaiMs = logs.reduce((sum, log) => sum + (log.openaiMs || 0), 0) / totalQueries;
+    const avgTokens = logs.reduce((sum, log) => sum + (log.totalTokensApprox || 0), 0) / totalQueries;
+    const avgSimilarity = logs
+      .filter((log) => log.maxSimilarity !== null)
+      .reduce((sum, log) => sum + (log.maxSimilarity || 0), 0) / logs.filter((log) => log.maxSimilarity !== null).length;
+
+    return {
+      agentId,
+      totalQueries,
+      answeredQueries,
+      idkQueries,
+      answerRate: ((answeredQueries / totalQueries) * 100).toFixed(2) + '%',
+      avgLatencyMs: Math.round(avgLatency),
+      avgRetrievalMs: Math.round(avgRetrievalMs),
+      avgOpenaiMs: Math.round(avgOpenaiMs),
+      avgTokensUsed: Math.round(avgTokens),
+      avgMaxSimilarity: avgSimilarity ? avgSimilarity.toFixed(3) : null,
+      recentQueries: logs.slice(0, 10).map((log) => ({
+        query: log.query,
+        outcome: log.outcome,
+        latencyMs: log.latencyMs,
+        createdAt: log.createdAt,
+      })),
+    };
   }
 }

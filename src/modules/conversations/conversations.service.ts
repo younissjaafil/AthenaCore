@@ -11,7 +11,11 @@ import OpenAI from 'openai';
 import { ConversationsRepository } from './repositories/conversations.repository';
 import { MessagesRepository } from './repositories/messages.repository';
 import { ConversationCacheService } from './cache/conversation-cache.service';
-import { VectorSearchService } from '../rag/vector-search.service';
+import {
+  VectorSearchService,
+  AgentRagConfig,
+} from '../rag/vector-search.service';
+import { RagQueryLogService } from '../rag/rag-query-log.service';
 import {
   Conversation,
   ConversationStatus,
@@ -34,6 +38,7 @@ export class ConversationsService {
     private readonly messagesRepository: MessagesRepository,
     private readonly cacheService: ConversationCacheService,
     private readonly vectorSearchService: VectorSearchService,
+    private readonly ragQueryLogService: RagQueryLogService,
     @InjectRepository(Agent)
     private readonly agentRepository: Repository<Agent>,
   ) {
@@ -333,7 +338,7 @@ export class ConversationsService {
   }
 
   /**
-   * Generate AI response with RAG context
+   * Generate AI response with RAG context and guardrails
    */
   private async generateAIResponse(
     conversation: Conversation,
@@ -343,43 +348,84 @@ export class ConversationsService {
     content: string;
     metadata: any;
   }> {
+    const agent = conversation.agent;
     let ragContext = '';
     let ragSources: any[] = [];
+    let ragOutcome: 'answered' | 'idk' = 'answered';
+    let idkReason: string | undefined;
+    let retrievalMs = 0;
+    let contextTokenCount = 0;
+    let citations: any[] = [];
+
+    // Build agent RAG config from entity fields
+    const ragConfig: AgentRagConfig = {
+      ragSimilarityThreshold: Number(agent.ragSimilarityThreshold) || 0.7,
+      ragMaxResults: agent.ragMaxResults || 10,
+      ragMaxTokens: agent.ragMaxTokens || 3000,
+      ragMinConfidenceThreshold:
+        Number(agent.ragMinConfidenceThreshold) || 0.55,
+      ragEnableGuardrails: agent.ragEnableGuardrails ?? true,
+      ragEnableReranking: agent.ragEnableReranking ?? false,
+      ragIdkMessage: agent.ragIdkMessage,
+    };
 
     // Get RAG context if enabled
     if (useRag) {
       try {
-        // Retrieve more chunks for comprehensive context
-        const searchResults = await this.vectorSearchService.search(
+        const searchResult = await this.vectorSearchService.searchWithGuardrails(
           conversation.agentId,
           userQuery,
-          10, // Get more chunks for better coverage
-          0.4, // Lower threshold to include more relevant content
+          ragConfig,
         );
+
+        ragContext = searchResult.context;
+        ragOutcome = searchResult.guardrail.outcome;
+        idkReason = searchResult.guardrail.reason;
+        retrievalMs = searchResult.retrievalMs;
+        contextTokenCount = searchResult.contextTokenCount;
+        citations = searchResult.citations;
+
+        // Store source references
+        ragSources = searchResult.results.map((result) => ({
+          documentId: result.documentId,
+          chunkIndex: result.chunkIndex,
+          similarity: result.similarity,
+        }));
 
         this.logger.log(
-          `RAG: Found ${searchResults.length} relevant chunks for query`,
+          `RAG with guardrails: agent=${agent.id} outcome=${ragOutcome} results=${searchResult.results.length} tokens=${contextTokenCount}`,
         );
 
-        if (searchResults.length > 0) {
-          // Build context from search results
-          ragContext = searchResults
-            .map(
-              (result, idx) =>
-                `[Source ${idx + 1}] (Similarity: ${Math.round(result.similarity * 100)}%)\n${result.content}`,
-            )
-            .join('\n\n');
+        // If guardrail says IDK, return early with the IDK message
+        if (ragOutcome === 'idk' && ragConfig.ragEnableGuardrails) {
+          const idkMessage =
+            this.vectorSearchService.getIdkMessage(ragConfig);
 
-          // Store source references
-          ragSources = searchResults.map((result) => ({
-            documentId: result.documentId,
-            chunkIndex: result.chunkIndex,
-            similarity: result.similarity,
-          }));
+          // Log the query if logging is enabled
+          if (agent.ragEnableLogging) {
+            await this.logRagQuery(
+              conversation,
+              userQuery,
+              ragConfig,
+              ragOutcome,
+              idkReason,
+              retrievalMs,
+              contextTokenCount,
+              citations,
+            );
+          }
 
-          this.logger.log(
-            `Retrieved ${searchResults.length} RAG sources for conversation ${conversation.id}`,
-          );
+          return {
+            content: idkMessage,
+            metadata: {
+              model: agent.model,
+              ragContext: false,
+              ragSources: ragSources.length > 0 ? ragSources : undefined,
+              ragOutcome,
+              ragIdkReason: idkReason,
+              tokensUsed: this.estimateTokens(idkMessage),
+            },
+          };
         }
       } catch (error) {
         this.logger.warn(
@@ -395,7 +441,7 @@ export class ConversationsService {
     );
 
     // Build the prompt
-    const systemPrompt = this.buildSystemPrompt(conversation.agent, ragContext);
+    const systemPrompt = this.buildSystemPrompt(agent, ragContext);
     const messages: Array<{
       role: 'system' | 'user' | 'assistant';
       content: string;
@@ -410,37 +456,107 @@ export class ConversationsService {
 
     // Call OpenAI API
     let responseContent: string;
+    let openaiMs = 0;
+    let totalTokensApprox = 0;
+    const openaiStart = Date.now();
+
     try {
       const completion = await this.openai.chat.completions.create({
-        model: conversation.agent.model || 'gpt-4',
+        model: agent.model || 'gpt-4',
         messages,
-        temperature: Number(conversation.agent.temperature) || 0.7,
-        max_tokens: conversation.agent.maxTokens || 2000,
+        temperature: Number(agent.temperature) || 0.7,
+        max_tokens: agent.maxTokens || 2000,
       });
+
+      openaiMs = Date.now() - openaiStart;
+      totalTokensApprox = completion.usage?.total_tokens || 0;
 
       responseContent =
         completion.choices[0]?.message?.content ||
         'I apologize, but I was unable to generate a response. Please try again.';
 
       this.logger.log(
-        `OpenAI response generated for conversation ${conversation.id}, tokens: ${completion.usage?.total_tokens}`,
+        `OpenAI response generated for conversation ${conversation.id}, tokens: ${totalTokensApprox}, time: ${openaiMs}ms`,
       );
     } catch (error) {
+      openaiMs = Date.now() - openaiStart;
       const message = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`OpenAI API error: ${message}`);
       responseContent =
         'I apologize, but I encountered an error while processing your request. Please try again later.';
     }
 
+    // Log the RAG query if logging is enabled
+    if (useRag && agent.ragEnableLogging) {
+      await this.logRagQuery(
+        conversation,
+        userQuery,
+        ragConfig,
+        ragOutcome,
+        idkReason,
+        retrievalMs,
+        contextTokenCount,
+        citations,
+        openaiMs,
+        totalTokensApprox,
+        agent.model || 'gpt-4',
+      );
+    }
+
     return {
       content: responseContent,
       metadata: {
-        model: conversation.agent.model,
+        model: agent.model,
         ragContext: useRag && ragSources.length > 0,
         ragSources: ragSources.length > 0 ? ragSources : undefined,
+        ragOutcome: useRag ? ragOutcome : undefined,
         tokensUsed: this.estimateTokens(systemPrompt + responseContent),
       },
     };
+  }
+
+  /**
+   * Log RAG query for analytics
+   */
+  private async logRagQuery(
+    conversation: Conversation,
+    query: string,
+    config: AgentRagConfig,
+    outcome: 'answered' | 'idk',
+    idkReason: string | undefined,
+    retrievalMs: number,
+    contextTokenCount: number,
+    citations: any[],
+    openaiMs: number = 0,
+    totalTokensApprox: number = 0,
+    model: string = 'gpt-4',
+  ): Promise<void> {
+    try {
+      await this.ragQueryLogService.logQuery({
+        userId: conversation.userId,
+        agentId: conversation.agentId,
+        query,
+        topK: config.ragMaxResults,
+        stats: {
+          latencyMs: retrievalMs + openaiMs,
+          retrievalMs,
+          openaiMs,
+          topK: config.ragMaxResults,
+          retrievedCount: citations.length,
+          rerankUsed: config.ragEnableReranking,
+          contextTokenCount,
+          model,
+          totalTokensApprox,
+        },
+        citations,
+        guardrail: { outcome, reason: idkReason },
+        conversationId: conversation.id,
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Failed to log RAG query: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+    }
   }
 
   /**

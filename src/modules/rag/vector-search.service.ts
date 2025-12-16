@@ -4,6 +4,7 @@ import type { Cache } from 'cache-manager';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { EmbeddingsRepository } from './repositories/embeddings.repository';
 import { EmbeddingsService } from './embeddings.service';
+import { RagCitation } from './entities/rag-query-log.entity';
 
 export interface SearchResult {
   id: string;
@@ -16,6 +17,35 @@ export interface SearchResult {
   tokenCount: number;
   createdAt: Date;
 }
+
+export interface AgentRagConfig {
+  ragSimilarityThreshold: number;
+  ragMaxResults: number;
+  ragMaxTokens: number;
+  ragMinConfidenceThreshold: number;
+  ragEnableGuardrails: boolean;
+  ragEnableReranking: boolean;
+  ragIdkMessage?: string;
+}
+
+export type RagOutcome = 'answered' | 'idk';
+
+export interface GuardrailResult {
+  outcome: RagOutcome;
+  reason?: string;
+}
+
+export interface SearchWithGuardrailsResult {
+  results: SearchResult[];
+  citations: RagCitation[];
+  context: string;
+  contextTokenCount: number;
+  guardrail: GuardrailResult;
+  retrievalMs: number;
+}
+
+const DEFAULT_IDK_MESSAGE =
+  "I'm not confident this is covered in the current documents. It may be outside the scope of my knowledge base.";
 
 @Injectable()
 export class VectorSearchService {
@@ -104,6 +134,111 @@ export class VectorSearchService {
       `Built context with ${totalTokens} tokens from ${results.length} chunks`,
     );
     return context.trim();
+  }
+
+  /**
+   * Enhanced search with guardrails, reranking, and enterprise features.
+   * Returns search results along with guardrail outcome (answered/idk).
+   */
+  async searchWithGuardrails(
+    agentId: string,
+    query: string,
+    config: AgentRagConfig,
+  ): Promise<SearchWithGuardrailsResult> {
+    const t0 = Date.now();
+
+    // Perform similarity search
+    const results = await this.search(
+      agentId,
+      query,
+      config.ragMaxResults,
+      config.ragSimilarityThreshold,
+    );
+
+    const retrievalMs = Date.now() - t0;
+
+    // Calculate max similarity
+    const maxSimilarity =
+      results.length > 0 ? Math.max(...results.map((r) => r.similarity)) : 0;
+
+    // Guardrail check: if no results or similarity too low
+    if (config.ragEnableGuardrails) {
+      if (results.length === 0) {
+        return {
+          results: [],
+          citations: [],
+          context: '',
+          contextTokenCount: 0,
+          guardrail: { outcome: 'idk', reason: 'no_results' },
+          retrievalMs,
+        };
+      }
+
+      if (maxSimilarity < config.ragMinConfidenceThreshold) {
+        return {
+          results,
+          citations: this.buildCitations(results),
+          context: '',
+          contextTokenCount: 0,
+          guardrail: { outcome: 'idk', reason: 'low_similarity' },
+          retrievalMs,
+        };
+      }
+    }
+
+    // Apply reranking if enabled (sort by similarity descending)
+    let orderedResults = results;
+    if (config.ragEnableReranking) {
+      orderedResults = [...results].sort((a, b) => b.similarity - a.similarity);
+    }
+
+    // Build context with token budget
+    let context = '';
+    let contextTokenCount = 0;
+
+    for (const result of orderedResults) {
+      if (contextTokenCount + result.tokenCount > config.ragMaxTokens) {
+        break;
+      }
+
+      context += `\n\n[Source: ${result.metadata?.heading || 'Document'} | sim=${(result.similarity * 100).toFixed(1)}%]\n${result.content}`;
+      contextTokenCount += result.tokenCount;
+    }
+
+    const citations = this.buildCitations(orderedResults);
+
+    this.logger.log(
+      `RAG with guardrails: agent=${agentId} results=${results.length} maxSim=${(maxSimilarity * 100).toFixed(1)}% tokens=${contextTokenCount} retrieval=${retrievalMs}ms`,
+    );
+
+    return {
+      results: orderedResults,
+      citations,
+      context: context.trim(),
+      contextTokenCount,
+      guardrail: { outcome: 'answered' },
+      retrievalMs,
+    };
+  }
+
+  /**
+   * Build citations from search results
+   */
+  private buildCitations(results: SearchResult[]): RagCitation[] {
+    return results.map((r) => ({
+      documentId: r.documentId,
+      chunkIndex: r.chunkIndex,
+      snippet: r.content.slice(0, 500),
+      similarity: r.similarity,
+      metadata: r.metadata,
+    }));
+  }
+
+  /**
+   * Get the default IDK message or agent's custom message
+   */
+  getIdkMessage(agentConfig?: AgentRagConfig): string {
+    return agentConfig?.ragIdkMessage || DEFAULT_IDK_MESSAGE;
   }
 
   /**

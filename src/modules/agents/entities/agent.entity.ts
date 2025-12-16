@@ -127,6 +127,27 @@ export class Agent {
   @Column({ name: 'rag_max_tokens', type: 'int', default: 3000 })
   ragMaxTokens: number;
 
+  @Column({
+    name: 'rag_min_confidence_threshold',
+    type: 'decimal',
+    precision: 3,
+    scale: 2,
+    default: 0.55,
+  })
+  ragMinConfidenceThreshold: number;
+
+  @Column({ name: 'rag_enable_guardrails', type: 'boolean', default: true })
+  ragEnableGuardrails: boolean;
+
+  @Column({ name: 'rag_enable_reranking', type: 'boolean', default: false })
+  ragEnableReranking: boolean;
+
+  @Column({ name: 'rag_enable_logging', type: 'boolean', default: true })
+  ragEnableLogging: boolean;
+
+  @Column({ name: 'rag_idk_message', type: 'text', nullable: true })
+  ragIdkMessage: string;
+
   // Statistics
   @Column({ name: 'total_conversations', type: 'int', default: 0 })
   totalConversations: number;
