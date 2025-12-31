@@ -68,6 +68,21 @@ export class Embedding {
     [key: string]: any;
   };
 
+  // Hierarchical chunking fields
+  @Column({ name: 'hierarchy_level', type: 'int', default: 0 })
+  @Index()
+  hierarchyLevel: number;
+
+  @Column({ name: 'section_path', type: 'text', nullable: true })
+  @Index()
+  sectionPath?: string;
+
+  @Column({ name: 'parent_chunk_id', type: 'uuid', nullable: true })
+  @Index()
+  parentChunkId?: string;
+
+  // Note: content_tsvector is managed by PostgreSQL trigger, not exposed in entity
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

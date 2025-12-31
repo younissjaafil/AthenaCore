@@ -18,6 +18,12 @@ export interface RagCitation {
   snippet: string;
   similarity: number;
   metadata?: any;
+  // Enhanced citation fields
+  sectionPath?: string; // Hierarchical breadcrumb
+  hierarchyLevel?: number; // Heading level
+  bm25Score?: number; // Keyword match score
+  rerankScore?: number; // Final reranking score
+  retrievalMethod?: 'vector' | 'bm25' | 'hybrid'; // How this was retrieved
 }
 
 @Entity('rag_query_logs')

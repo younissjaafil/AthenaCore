@@ -72,12 +72,24 @@ export class EmbeddingsRepository {
     // Do NOT rely on TypeORM's returned order matching the input order.
     const vectorPoints = embeddingsWithIds
       .map((input) => {
-        const vector = input.vector;
-        if (!vector) return null;
+        const rawVector = input.vector;
+        const summaryVector = (input as any).summaryVector;
+        
+        if (!rawVector && !summaryVector) return null;
+
+        // Use named vectors if summary vector exists, otherwise use legacy single vector
+        const vectors: any = {};
+        if (rawVector) {
+          vectors.raw = rawVector;
+        }
+        if (summaryVector) {
+          vectors.summary = summaryVector;
+        }
 
         return {
           id: input.id as string,
-          vector,
+          vectors: Object.keys(vectors).length > 0 ? vectors : undefined,
+          vector: !summaryVector ? rawVector : undefined, // Legacy fallback
           payload: {
             agentId: input.agentId,
             documentId: input.documentId,
@@ -135,12 +147,29 @@ export class EmbeddingsRepository {
     limit: number = 5,
     threshold: number = 0.7,
   ): Promise<SimilaritySearchResult[]> {
-    // Search in Qdrant
+    return this.similaritySearchWithVectorName(
+      agentId,
+      queryVector,
+      limit,
+      threshold,
+      'raw',
+    );
+  }
+
+  async similaritySearchWithVectorName(
+    agentId: string,
+    queryVector: number[],
+    limit: number = 5,
+    threshold: number = 0.7,
+    vectorName: 'raw' | 'summary' = 'raw',
+  ): Promise<SimilaritySearchResult[]> {
+    // Search in Qdrant with specified vector name
     const results = await this.qdrantService.search(
       agentId,
       queryVector,
       limit,
       threshold,
+      vectorName,
     );
 
     // Fetch full embedding records from PostgreSQL

@@ -7,6 +7,7 @@ import { EmbeddingsRepository } from './repositories/embeddings.repository';
 import { DocumentsRepository } from '../documents/repositories/documents.repository';
 import { Document } from '../documents/entities/document.entity';
 import { Embedding } from './entities/embedding.entity';
+import { SummaryService } from './summary.service';
 
 interface ChunkMetadata {
   heading?: string;
@@ -16,6 +17,8 @@ interface ChunkMetadata {
   keywords?: string[];
   contentType?: string; // 'code' | 'list' | 'table' | 'qa' | 'definition'
   documentTitle?: string;
+  hierarchyLevel?: number;
+  sectionPath?: string;
   [key: string]: any;
 }
 
@@ -27,21 +30,44 @@ interface TextChunk {
   metadata?: ChunkMetadata;
 }
 
+interface HierarchicalChunk extends TextChunk {
+  hierarchyLevel: number; // 0 for content, 1-6 for heading levels
+  sectionPath?: string; // Breadcrumb path like "Introduction > Background"
+  parentChunkId?: string; // Reference to parent section chunk
+  position: number; // Ordinal position within document
+}
+
+interface DocumentSection {
+  level: number; // Heading level (1-6)
+  title: string;
+  content: string;
+  startPos: number;
+  endPos: number;
+  children: DocumentSection[];
+  parent?: DocumentSection;
+}
+
 @Injectable()
 export class EmbeddingsService {
   private readonly logger = new Logger(EmbeddingsService.name);
   private readonly openai: OpenAI;
   private readonly encoder;
-  // Optimized chunk sizes for better semantic coherence
-  private readonly maxTokensPerChunk = 400; // Smaller chunks = more precise retrieval
-  private readonly minTokensPerChunk = 100; // Avoid tiny chunks
-  private readonly chunkOverlap = 75; // More overlap = better context preservation
-  private readonly embeddingModel = 'text-embedding-3-small';
+  // Semantic chunking: prioritize meaningful boundaries over token counts
+  private readonly maxTokensPerChunk = 2000; // Safety limit only (very high) - chunks follow paragraphs/sections
+  private readonly minTokensPerChunk = 10; // Safety limit only (very low) - allow meaningful small chunks
+  private readonly chunkOverlap = 50; // Minimal overlap (1-2 sentences) for context preservation
+  private readonly hierarchicalChunkOverlap = 30; // Minimal overlap for hierarchical (1 sentence)
+  private readonly embeddingModel = 'text-embedding-3-large';
+  private readonly enableHierarchicalChunking = true; // Feature flag
+  private readonly enableMultiVector = true; // Feature flag for multi-vector embeddings
+  // Chunking strategy: paragraph-based (one paragraph = one chunk, or group related paragraphs)
+  private readonly chunkByParagraphs = true; // Prioritize paragraph boundaries
 
   constructor(
     private readonly configService: ConfigService,
     private readonly embeddingsRepository: EmbeddingsRepository,
     private readonly documentsRepository: DocumentsRepository,
+    private readonly summaryService: SummaryService,
   ) {
     const apiKey = this.configService.get<string>('OPENAI_API_KEY');
     if (!apiKey) {
@@ -95,10 +121,15 @@ export class EmbeddingsService {
 
     // Chunk the document
     // Include filename/title in metadata so queries that reference the document name can retrieve.
-    const chunks = this.chunkText(document.extractedText, {
-      ...(document.metadata || {}),
-      filename: documentTitle,
-    });
+    const chunks = this.enableHierarchicalChunking
+      ? this.chunkTextHierarchically(document.extractedText, {
+          ...(document.metadata || {}),
+          filename: documentTitle,
+        })
+      : this.chunkText(document.extractedText, {
+          ...(document.metadata || {}),
+          filename: documentTitle,
+        });
     this.logger.log(`Created ${chunks.length} chunks from document`);
 
     // Generate embeddings in batches
@@ -115,114 +146,403 @@ export class EmbeddingsService {
   }
 
   /**
-   * Chunk text into overlapping segments with semantic awareness
-   * Uses sentence boundaries and paragraph preservation for better context
+   * Chunk text into meaningful segments based on paragraph boundaries
+   * Each paragraph becomes its own chunk (unless extremely long)
    */
   private chunkText(text: string, metadata?: any): TextChunk[] {
     const chunks: TextChunk[] = [];
 
-    // First, split by paragraphs (double newlines or markdown headers)
+    // Split by paragraphs (double newlines or markdown headers)
     const paragraphs = this.splitIntoParagraphs(text);
 
-    let currentChunk = '';
-    let currentTokenCount = 0;
-    let chunkStartPosition = 0;
     let position = 0;
 
     for (const paragraph of paragraphs) {
       const paragraphTokens = this.encoder.encode(paragraph);
       const paragraphTokenCount = paragraphTokens.length;
+      const trimmedParagraph = paragraph.trim();
 
-      // If single paragraph exceeds max, split by sentences
+      // Skip empty paragraphs
+      if (!trimmedParagraph) {
+        continue;
+      }
+
+      // If paragraph is extremely long (safety check), split by sentences
       if (paragraphTokenCount > this.maxTokensPerChunk) {
-        // Save current chunk if not empty
-        if (currentChunk.trim()) {
-          chunks.push(
-            this.createChunk(
-              currentChunk.trim(),
-              currentTokenCount,
-              chunkStartPosition,
-              position,
-              metadata,
-            ),
-          );
-        }
-
-        // Split long paragraph by sentences
         const sentenceChunks = this.splitLongParagraphBySentences(
           paragraph,
           position,
           metadata,
         );
         chunks.push(...sentenceChunks);
-
         position += paragraphTokenCount;
-        currentChunk = '';
-        currentTokenCount = 0;
-        chunkStartPosition = position;
         continue;
       }
 
-      // Check if adding this paragraph would exceed max tokens
-      if (currentTokenCount + paragraphTokenCount > this.maxTokensPerChunk) {
-        // Save current chunk and start new one
-        if (currentChunk.trim()) {
-          chunks.push(
-            this.createChunk(
-              currentChunk.trim(),
-              currentTokenCount,
-              chunkStartPosition,
-              position,
-              metadata,
-            ),
-          );
-        }
+      // Each paragraph becomes its own chunk (meaningful semantic unit)
+      // Add minimal overlap from previous chunk if available
+      let chunkContent = trimmedParagraph;
+      let chunkStartPos = position;
+      let chunkTokenCount = paragraphTokenCount;
 
-        // Start new chunk with overlap (include last part of previous chunk)
-        const overlapText = this.getOverlapText(currentChunk);
-        currentChunk = overlapText + paragraph + '\n\n';
-        currentTokenCount = this.encoder.encode(currentChunk).length;
-        chunkStartPosition = position - this.encoder.encode(overlapText).length;
-      } else {
-        // Add paragraph to current chunk
-        currentChunk += paragraph + '\n\n';
-        currentTokenCount += paragraphTokenCount + 2; // +2 for newlines
+      // Add overlap from previous chunk if it exists
+      if (chunks.length > 0) {
+        const prevChunk = chunks[chunks.length - 1];
+        const overlapText = this.getOverlapText(prevChunk.content);
+        if (overlapText) {
+          chunkContent = overlapText + '\n\n' + trimmedParagraph;
+          chunkTokenCount = this.encoder.encode(chunkContent).length;
+          chunkStartPos = position - this.encoder.encode(overlapText).length;
+        }
       }
+
+      chunks.push(
+        this.createChunk(
+          chunkContent,
+          chunkTokenCount,
+          chunkStartPos,
+          position + paragraphTokenCount,
+          metadata,
+        ),
+      );
 
       position += paragraphTokenCount;
     }
 
-    // Don't forget the last chunk
-    if (currentChunk.trim() && currentTokenCount >= this.minTokensPerChunk) {
-      chunks.push(
-        this.createChunk(
-          currentChunk.trim(),
-          currentTokenCount,
-          chunkStartPosition,
-          position,
-          metadata,
-        ),
+    return chunks;
+  }
+
+  /**
+   * Hierarchical chunking: preserves document structure (headings → sections → paragraphs)
+   */
+  private chunkTextHierarchically(
+    text: string,
+    documentMetadata?: any,
+  ): HierarchicalChunk[] {
+    const chunks: HierarchicalChunk[] = [];
+
+    // Parse document structure into hierarchical sections
+    const sections = this.parseDocumentHierarchy(text);
+
+    // Process each section hierarchically
+    let globalPosition = 0;
+    const parentChunkMap = new Map<string, string>(); // section path -> parent chunk ID
+
+    for (const section of sections) {
+      const sectionChunks = this.processSectionHierarchically(
+        section,
+        documentMetadata,
+        globalPosition,
+        parentChunkMap,
       );
-    } else if (currentChunk.trim() && chunks.length > 0) {
-      // Append small remaining text to last chunk
-      const lastChunk = chunks[chunks.length - 1];
-      lastChunk.content += '\n\n' + currentChunk.trim();
-      lastChunk.tokenCount += currentTokenCount;
-      lastChunk.endPosition = position;
-    } else if (currentChunk.trim()) {
-      // Edge case: only one small chunk
-      chunks.push(
-        this.createChunk(
-          currentChunk.trim(),
-          currentTokenCount,
-          chunkStartPosition,
-          position,
-          metadata,
-        ),
+
+      chunks.push(...sectionChunks);
+      globalPosition =
+        sectionChunks.length > 0
+          ? sectionChunks[sectionChunks.length - 1].endPosition
+          : globalPosition;
+    }
+
+    // Assign parent chunk IDs after all chunks are created
+    this.assignParentChunkIds(chunks, parentChunkMap);
+
+    return chunks;
+  }
+
+  /**
+   * Parse document into hierarchical sections based on markdown headers
+   */
+  private parseDocumentHierarchy(text: string): DocumentSection[] {
+    const sections: DocumentSection[] = [];
+    const lines = text.split('\n');
+
+    let currentSection: DocumentSection | null = null;
+    let currentContent: string[] = [];
+    let position = 0;
+    const sectionStack: DocumentSection[] = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const headerMatch = line.match(/^(#{1,6})\s+(.+)$/);
+
+      if (headerMatch) {
+        // Save previous section if exists
+        if (currentSection) {
+          currentSection.content = currentContent.join('\n').trim();
+          currentSection.endPos = position;
+        }
+
+        const level = headerMatch[1].length;
+        const title = headerMatch[2].trim();
+
+        // Pop stack until we find parent level
+        while (
+          sectionStack.length > 0 &&
+          sectionStack[sectionStack.length - 1].level >= level
+        ) {
+          sectionStack.pop();
+        }
+
+        const parent =
+          sectionStack.length > 0
+            ? sectionStack[sectionStack.length - 1]
+            : undefined;
+
+        const newSection: DocumentSection = {
+          level,
+          title,
+          content: '',
+          startPos: position,
+          endPos: position,
+          children: [],
+          parent,
+        };
+
+        if (parent) {
+          parent.children.push(newSection);
+        } else {
+          sections.push(newSection);
+        }
+
+        sectionStack.push(newSection);
+        currentSection = newSection;
+        currentContent = [];
+      } else {
+        currentContent.push(line);
+      }
+
+      position += this.encoder.encode(line + '\n').length;
+    }
+
+    // Save last section
+    if (currentSection) {
+      currentSection.content = currentContent.join('\n').trim();
+      currentSection.endPos = position;
+    }
+
+    return sections;
+  }
+
+  /**
+   * Process a section hierarchically, creating chunks with proper metadata
+   */
+  private processSectionHierarchically(
+    section: DocumentSection,
+    documentMetadata: any,
+    startPosition: number,
+    parentChunkMap: Map<string, string>,
+  ): HierarchicalChunk[] {
+    const chunks: HierarchicalChunk[] = [];
+    const sectionPath = this.buildSectionPath(section);
+
+    // If section has a heading, create a heading chunk separately
+    if (section.title) {
+      const headingLine = `#${'#'.repeat(section.level - 1)} ${section.title}`;
+      const headingTokensOnly = this.encoder.encode(headingLine);
+
+      // Create heading chunk
+      const headingChunk: HierarchicalChunk = {
+        content: headingLine,
+        tokenCount: headingTokensOnly.length,
+        startPosition,
+        endPosition: startPosition + headingTokensOnly.length,
+        hierarchyLevel: section.level,
+        sectionPath,
+        position: chunks.length,
+        metadata: this.extractChunkMetadata(headingLine, {
+          ...documentMetadata,
+          heading: section.title,
+          section: sectionPath,
+        }),
+      };
+      chunks.push(headingChunk);
+      parentChunkMap.set(sectionPath, headingChunk.content);
+
+      // Process content paragraphs separately (each paragraph = one chunk)
+      if (section.content.trim().length > 0) {
+        // Process content paragraphs - each paragraph becomes its own chunk
+        const paragraphs = this.splitIntoParagraphs(section.content);
+        let currentPos = startPosition + headingTokensOnly.length;
+
+        for (const paragraph of paragraphs) {
+          const trimmedParagraph = paragraph.trim();
+
+          // Skip empty paragraphs
+          if (!trimmedParagraph) {
+            continue;
+          }
+
+          const paraTokens = this.encoder.encode(trimmedParagraph);
+          const paraTokenCount = paraTokens.length;
+
+          // If paragraph is extremely long (safety check), split by sentences
+          if (paraTokenCount > this.maxTokensPerChunk) {
+            const sentenceChunks =
+              this.splitLongParagraphBySentencesHierarchically(
+                trimmedParagraph,
+                currentPos,
+                sectionPath,
+                section.level,
+                documentMetadata,
+              );
+            chunks.push(...sentenceChunks);
+            currentPos =
+              sentenceChunks.length > 0
+                ? sentenceChunks[sentenceChunks.length - 1].endPosition
+                : currentPos;
+            continue;
+          }
+
+          // Each paragraph becomes its own chunk (meaningful semantic unit)
+          // Add minimal overlap from previous chunk if available
+          let chunkContent = trimmedParagraph;
+          let chunkStartPos = currentPos;
+          let chunkTokenCount = paraTokenCount;
+
+          // Add overlap from previous chunk if it exists
+          if (chunks.length > 0) {
+            const prevChunk = chunks[chunks.length - 1];
+            const overlapText = this.getOverlapText(prevChunk.content);
+            if (overlapText) {
+              chunkContent = overlapText + '\n\n' + trimmedParagraph;
+              chunkTokenCount = this.encoder.encode(chunkContent).length;
+              chunkStartPos =
+                currentPos - this.encoder.encode(overlapText).length;
+            }
+          }
+
+          const newChunk: HierarchicalChunk = {
+            content: chunkContent,
+            tokenCount: chunkTokenCount,
+            startPosition: chunkStartPos,
+            endPosition: currentPos + paraTokenCount,
+            hierarchyLevel: 0, // Content chunk
+            sectionPath,
+            position: chunks.length,
+            metadata: this.extractChunkMetadata(trimmedParagraph, {
+              ...documentMetadata,
+              section: sectionPath,
+            }),
+          };
+          chunks.push(newChunk);
+          currentPos = newChunk.endPosition;
+        }
+      }
+    }
+
+    // Process child sections recursively
+    for (const child of section.children) {
+      const childChunks = this.processSectionHierarchically(
+        child,
+        documentMetadata,
+        chunks.length > 0
+          ? chunks[chunks.length - 1].endPosition
+          : startPosition,
+        parentChunkMap,
       );
+      chunks.push(...childChunks);
     }
 
     return chunks;
+  }
+
+  /**
+   * Build section path breadcrumb
+   */
+  private buildSectionPath(section: DocumentSection): string {
+    const path: string[] = [];
+    let current: DocumentSection | undefined = section;
+
+    while (current) {
+      path.unshift(current.title);
+      current = current.parent;
+    }
+
+    return path.join(' > ');
+  }
+
+  /**
+   * Split long paragraph by sentences (hierarchical version)
+   */
+  private splitLongParagraphBySentencesHierarchically(
+    paragraph: string,
+    startPosition: number,
+    sectionPath: string,
+    hierarchyLevel: number,
+    metadata?: any,
+  ): HierarchicalChunk[] {
+    const chunks: HierarchicalChunk[] = [];
+    const sentences = paragraph.match(/[^.!?]+[.!?]+[\s]*/g) || [paragraph];
+
+    let currentChunk = '';
+    let currentTokenCount = 0;
+    let chunkStartPos = startPosition;
+    let position = startPosition;
+
+    for (const sentence of sentences) {
+      const sentenceTokens = this.encoder.encode(sentence);
+      const sentenceTokenCount = sentenceTokens.length;
+
+      if (
+        currentTokenCount + sentenceTokenCount > this.maxTokensPerChunk &&
+        currentChunk.trim()
+      ) {
+        chunks.push({
+          content: currentChunk.trim(),
+          tokenCount: currentTokenCount,
+          startPosition: chunkStartPos,
+          endPosition: position,
+          hierarchyLevel: 0,
+          sectionPath,
+          position: chunks.length,
+          metadata: this.extractChunkMetadata(currentChunk, metadata),
+        });
+
+        // Minimal overlap: last 1-2 sentences
+        const overlapSentences = sentences
+          .slice(
+            Math.max(0, sentences.indexOf(sentence) - 2),
+            sentences.indexOf(sentence),
+          )
+          .join(' ');
+        currentChunk = overlapSentences + sentence;
+        currentTokenCount = this.encoder.encode(currentChunk).length;
+        chunkStartPos = position - this.encoder.encode(overlapSentences).length;
+      } else {
+        currentChunk += sentence;
+        currentTokenCount += sentenceTokenCount;
+      }
+
+      position += sentenceTokenCount;
+    }
+
+    if (currentChunk.trim()) {
+      chunks.push({
+        content: currentChunk.trim(),
+        tokenCount: currentTokenCount,
+        startPosition: chunkStartPos,
+        endPosition: position,
+        hierarchyLevel: 0,
+        sectionPath,
+        position: chunks.length,
+        metadata: this.extractChunkMetadata(currentChunk, metadata),
+      });
+    }
+
+    return chunks;
+  }
+
+  /**
+   * Assign parent chunk IDs to hierarchical chunks
+   */
+  private assignParentChunkIds(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _chunks: HierarchicalChunk[],
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _parentChunkMap: Map<string, string>,
+  ): void {
+    // This will be called after chunks are saved to DB
+    // For now, we'll store the section path and assign IDs during embedding creation
   }
 
   /**
@@ -518,7 +838,7 @@ export class EmbeddingsService {
   private async generateEmbeddingsForChunks(
     agentId: string,
     documentId: string,
-    chunks: TextChunk[],
+    chunks: (TextChunk | HierarchicalChunk)[],
     documentTitle?: string,
   ): Promise<void> {
     const batchSize = 100; // OpenAI allows up to 2048 inputs per request
@@ -544,32 +864,80 @@ export class EmbeddingsService {
           continue;
         }
 
-        // Sanitize input: remove null bytes and control characters
-        const sanitizedInputs = validChunks.map((chunk) => {
+        // Generate summaries for multi-vector approach
+        let summaries: string[] = [];
+        if (this.enableMultiVector) {
+          try {
+            summaries = await this.summaryService.generateSummariesBatch(
+              validChunks.map((chunk) => chunk.content),
+            );
+          } catch (error: any) {
+            this.logger.warn(
+              `Failed to generate summaries for batch ${i / batchSize + 1}: ${error.message}. Continuing with raw embeddings only.`,
+            );
+            summaries = validChunks.map((chunk) => chunk.content); // Fallback to original
+          }
+        } else {
+          summaries = validChunks.map((chunk) => chunk.content);
+        }
+
+        // Sanitize inputs: remove null bytes and control characters
+        const sanitizedRawInputs = validChunks.map((chunk) => {
           const contentForEmbedding = `${titlePrefix}${chunk.content}`;
           return this.sanitizeEmbeddingInput(contentForEmbedding);
         });
 
-        // Generate embeddings
-        const response = await this.openai.embeddings.create({
+        const sanitizedSummaryInputs = summaries.map((summary, summaryIdx) => {
+          const summaryForEmbedding =
+            this.enableMultiVector &&
+            summary !== validChunks[summaryIdx]?.content
+              ? `${titlePrefix}${summary}`
+              : sanitizedRawInputs[summaryIdx];
+          return this.sanitizeEmbeddingInput(summaryForEmbedding);
+        });
+
+        // Generate raw embeddings
+        const rawResponse = await this.openai.embeddings.create({
           model: this.embeddingModel,
-          input: sanitizedInputs,
+          input: sanitizedRawInputs,
+          encoding_format: 'float',
+        });
+
+        // Generate summary embeddings (use raw if summaries failed)
+        const summaryResponse = await this.openai.embeddings.create({
+          model: this.embeddingModel,
+          input: sanitizedSummaryInputs,
           encoding_format: 'float',
         });
 
         // Save to database (use original chunks for indices)
-        const embeddingsData = validChunks.map((chunk, idx) => ({
-          agentId,
-          documentId,
-          chunkIndex: i + batch.indexOf(chunk),
-          content: chunk.content,
-          tokenCount: chunk.tokenCount,
-          startPosition: chunk.startPosition,
-          endPosition: chunk.endPosition,
-          vector: response.data[idx].embedding,
-          model: this.embeddingModel,
-          metadata: chunk.metadata,
-        }));
+        const embeddingsData = validChunks.map((chunk, idx) => {
+          const isHierarchical = 'hierarchyLevel' in chunk;
+          const hierarchicalChunk: HierarchicalChunk | null = isHierarchical
+            ? chunk
+            : null;
+
+          return {
+            agentId,
+            documentId,
+            chunkIndex: i + batch.indexOf(chunk),
+            content: chunk.content,
+            tokenCount: chunk.tokenCount,
+            startPosition: chunk.startPosition,
+            endPosition: chunk.endPosition,
+            vector: rawResponse.data[idx].embedding, // Raw embedding
+            summaryVector: summaryResponse.data[idx].embedding, // Summary embedding
+            model: this.embeddingModel,
+            metadata: {
+              ...chunk.metadata,
+              hierarchyLevel: hierarchicalChunk?.hierarchyLevel,
+              sectionPath: hierarchicalChunk?.sectionPath,
+            },
+            hierarchyLevel: hierarchicalChunk?.hierarchyLevel ?? 0,
+            sectionPath: hierarchicalChunk?.sectionPath,
+            parentChunkId: undefined, // Will be set after all chunks are saved
+          };
+        });
 
         await this.embeddingsRepository.createBulk(embeddingsData);
       } catch (error: any) {

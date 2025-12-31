@@ -82,4 +82,47 @@ export class EnvironmentVariables {
   @IsString()
   @IsOptional()
   CLERK_WEBHOOK_SECRET?: string;
+
+  @IsString()
+  @IsOptional()
+  QDRANT_URL?: string;
+
+  @IsString()
+  @IsOptional()
+  QDRANT_API_KEY?: string;
+
+  // Reranking configuration
+  @IsString()
+  @IsOptional()
+  RERANK_PROVIDER?: string;
+
+  @IsString()
+  @IsOptional()
+  RERANK_API_KEY?: string;
+
+  @IsString()
+  @IsOptional()
+  RERANK_MODEL?: string;
+
+  @IsString()
+  @IsOptional()
+  RERANK_BASE_URL?: string;
+
+  // BM25 configuration
+  @IsString()
+  @IsOptional()
+  BM25_K1?: string;
+
+  @IsString()
+  @IsOptional()
+  BM25_B?: string;
+
+  // Hybrid search weights
+  @IsString()
+  @IsOptional()
+  HYBRID_BM25_WEIGHT?: string;
+
+  @IsString()
+  @IsOptional()
+  HYBRID_VECTOR_WEIGHT?: string;
 }

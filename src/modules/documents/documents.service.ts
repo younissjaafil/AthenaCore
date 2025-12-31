@@ -102,6 +102,18 @@ export class DocumentsService {
       file.buffer,
       file.mimetype,
     );
+    
+    // Verify the file was actually uploaded to S3
+    const fileExists = await this.s3Service.fileExists(s3Key);
+    if (!fileExists) {
+      this.logger.error(
+        `File upload appeared to succeed but file not found in S3: ${s3Key}`,
+      );
+      throw new BadRequestException(
+        `File upload failed: file was not saved to storage. Please try again.`,
+      );
+    }
+    
     const s3Url = this.s3Service.getBlobUrl(s3Key);
 
     if (!isNew) {
@@ -249,7 +261,23 @@ export class DocumentsService {
   private async processDocumentAsync(documentId: string): Promise<void> {
     try {
       const document = await this.documentsRepository.findById(documentId);
-      if (!document) return;
+      if (!document) {
+        this.logger.warn(`Document ${documentId} not found, skipping processing`);
+        return;
+      }
+
+      // Verify file exists in S3 before processing
+      const fileExists = await this.s3Service.fileExists(document.s3Key);
+      if (!fileExists) {
+        const errorMessage = `File not found in S3 storage: ${document.s3Key} (document: ${document.originalFilename || document.filename})`;
+        this.logger.error(errorMessage);
+        await this.documentsRepository.updateStatus(
+          documentId,
+          DocumentStatus.FAILED,
+          errorMessage,
+        );
+        return;
+      }
 
       // Download file from S3
       const fileBuffer = await this.s3Service.getFile(document.s3Key);
@@ -286,14 +314,29 @@ export class DocumentsService {
         `Document ${documentId} processed successfully with ${chunkCount} chunks`,
       );
     } catch (error: any) {
+      const document = await this.documentsRepository.findById(documentId);
+      const filename = document?.originalFilename || document?.filename || 'unknown';
+      
+      // Create a more descriptive error message
+      let errorMessage = error.message || 'Unknown error occurred';
+      
+      // Enhance error message with context
+      if (errorMessage.includes('not found') || errorMessage.includes('NotFound') || errorMessage.includes('NoSuchKey')) {
+        errorMessage = `File not found in storage: ${filename}. The file may not have been uploaded successfully to S3.`;
+      } else if (errorMessage.includes('S3')) {
+        errorMessage = `S3 storage error: ${errorMessage}`;
+      } else {
+        errorMessage = `Processing error: ${errorMessage}`;
+      }
+      
       this.logger.error(
-        `Document processing failed for ${documentId}:`,
-        error.stack,
+        `Document processing failed for ${documentId} (${filename}):`,
+        error.stack || error,
       );
       await this.documentsRepository.updateStatus(
         documentId,
         DocumentStatus.FAILED,
-        error.message,
+        errorMessage,
       );
     }
   }

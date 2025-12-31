@@ -11,6 +11,10 @@ import { RagController } from './rag.controller';
 import { DocumentsModule } from '../documents/documents.module';
 import { UsersModule } from '../users/users.module';
 import { VectorStoreModule } from '../../infrastructure/vector-store/vector-store.module';
+import { SummaryService } from './summary.service';
+import { BM25Service } from './bm25.service';
+import { RerankerService } from './reranker.service';
+import { HybridSearchService } from './hybrid-search.service';
 
 @Module({
   imports: [
@@ -26,7 +30,19 @@ import { VectorStoreModule } from '../../infrastructure/vector-store/vector-stor
     EmbeddingsService,
     VectorSearchService,
     RagQueryLogService,
+    SummaryService,
+    BM25Service,
+    RerankerService,
+    HybridSearchService,
   ],
-  exports: [EmbeddingsService, VectorSearchService, RagQueryLogService],
+  exports: [
+    EmbeddingsService,
+    VectorSearchService,
+    RagQueryLogService,
+    SummaryService,
+    BM25Service,
+    RerankerService,
+    HybridSearchService,
+  ],
 })
 export class RagModule {}

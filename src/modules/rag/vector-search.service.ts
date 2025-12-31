@@ -5,6 +5,8 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { EmbeddingsRepository } from './repositories/embeddings.repository';
 import { EmbeddingsService } from './embeddings.service';
 import { RagCitation } from './entities/rag-query-log.entity';
+import { HybridSearchService, HybridSearchResult } from './hybrid-search.service';
+import { RerankerService, RerankedResult } from './reranker.service';
 
 export interface SearchResult {
   id: string;
@@ -57,10 +59,14 @@ export class VectorSearchService {
   private readonly fallbackSearchThreshold = 0.35;
   private readonly hardIdkSimilarityFloor = 0.25;
 
+  private readonly enableHybridSearch = true; // Feature flag
+
   constructor(
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
     private readonly embeddingsRepository: EmbeddingsRepository,
     private readonly embeddingsService: EmbeddingsService,
+    private readonly hybridSearchService: HybridSearchService,
+    private readonly rerankerService: RerankerService,
   ) {}
 
   /**
@@ -178,27 +184,53 @@ export class VectorSearchService {
   ): Promise<SearchWithGuardrailsResult> {
     const t0 = Date.now();
 
-    // Perform similarity search
-    let results = await this.search(
-      agentId,
-      query,
-      config.ragMaxResults,
-      config.ragSimilarityThreshold,
-    );
+    // Use hybrid search if enabled, otherwise fall back to vector search
+    let hybridResults: HybridSearchResult[] = [];
+    let results: SearchResult[] = [];
 
-    // Many real-world queries land below strict similarity thresholds.
-    // If the first pass returns nothing, fall back to a safer threshold so we can
-    // still compute guardrails based on maxSimilarity.
-    if (
-      results.length === 0 &&
-      config.ragSimilarityThreshold > this.fallbackSearchThreshold
-    ) {
+    if (this.enableHybridSearch) {
+      // Perform hybrid search: BM25 + Vector (raw + summary) with RRF
+      hybridResults = await this.hybridSearchService.hybridSearch(
+        agentId,
+        query,
+        Math.max(config.ragMaxResults, 20), // Get top 20 for reranking
+        config.ragSimilarityThreshold,
+      );
+
+      // Convert hybrid results to SearchResult format
+      results = hybridResults.map((r) => ({
+        id: r.id,
+        agentId: r.agentId,
+        documentId: r.documentId,
+        documentName: r.documentName,
+        chunkIndex: r.chunkIndex,
+        content: r.content,
+        similarity: r.similarity,
+        metadata: r.metadata,
+        tokenCount: r.tokenCount,
+        createdAt: r.createdAt,
+      }));
+    } else {
+      // Fallback to original vector search
       results = await this.search(
         agentId,
         query,
         config.ragMaxResults,
-        this.fallbackSearchThreshold,
+        config.ragSimilarityThreshold,
       );
+
+      // Fallback threshold if no results
+      if (
+        results.length === 0 &&
+        config.ragSimilarityThreshold > this.fallbackSearchThreshold
+      ) {
+        results = await this.search(
+          agentId,
+          query,
+          config.ragMaxResults,
+          this.fallbackSearchThreshold,
+        );
+      }
     }
 
     const retrievalMs = Date.now() - t0;
@@ -236,9 +268,41 @@ export class VectorSearchService {
       }
     }
 
-    // Apply reranking if enabled (sort by similarity descending)
-    let orderedResults = results;
-    if (config.ragEnableReranking) {
+    // Apply semantic reranking if enabled
+    let orderedResults: SearchResult[] = results;
+    if (config.ragEnableReranking && this.rerankerService.isConfigured()) {
+      try {
+        // Rerank top 20 → top 6
+        const reranked = await this.rerankerService.rerank(
+          query,
+          results.slice(0, 20), // Rerank top 20
+          6, // Return top 6
+        );
+
+        // Convert reranked results back to SearchResult format
+        orderedResults = reranked.map((r) => ({
+          id: r.id,
+          agentId: r.agentId,
+          documentId: r.documentId,
+          documentName: r.documentName,
+          chunkIndex: r.chunkIndex,
+          content: r.content,
+          similarity: r.rerankScore, // Use rerank score
+          metadata: r.metadata,
+          tokenCount: r.tokenCount,
+          createdAt: r.createdAt,
+        }));
+      } catch (error: any) {
+        this.logger.warn(
+          `Reranking failed: ${error.message}, falling back to similarity sort`,
+        );
+        // Fallback to similarity-based sorting
+        orderedResults = [...results].sort(
+          (a, b) => b.similarity - a.similarity,
+        );
+      }
+    } else if (config.ragEnableReranking) {
+      // Reranking enabled but not configured, use similarity sort
       orderedResults = [...results].sort((a, b) => b.similarity - a.similarity);
     }
 
@@ -280,7 +344,7 @@ export class VectorSearchService {
   }
 
   /**
-   * Build a descriptive source label for context
+   * Build a descriptive source label for context with hierarchical paths
    */
   private buildSourceLabel(result: SearchResult, sourceNum: number): string {
     const parts: string[] = [];
@@ -290,8 +354,10 @@ export class VectorSearchService {
       result.documentName || result.metadata?.documentTitle || 'Document';
     parts.push(docName);
 
-    // Section/heading if available
-    if (result.metadata?.heading) {
+    // Hierarchical section path (preferred)
+    if (result.metadata?.sectionPath) {
+      parts.push(result.metadata.sectionPath);
+    } else if (result.metadata?.heading) {
       parts.push(`§ ${result.metadata.heading}`);
     } else if (result.metadata?.section) {
       parts.push(`§ ${result.metadata.section}`);
@@ -302,24 +368,47 @@ export class VectorSearchService {
       parts.push(`[${result.metadata.contentType}]`);
     }
 
-    // Relevance score
+    // Relevance score and retrieval method
     const relevance = (result.similarity * 100).toFixed(0);
+    const hybridResult = result as any;
+    const retrievalMethod = hybridResult.retrievalMethod || 'vector';
+    const methodLabel =
+      retrievalMethod === 'hybrid'
+        ? 'Hybrid'
+        : retrievalMethod === 'bm25'
+          ? 'BM25'
+          : 'Vector';
 
-    return `--- [Source #${sourceNum}: ${parts.join(' > ')}] (${relevance}% relevance) ---`;
+    // Include BM25 score if available
+    const bm25Info =
+      hybridResult.bm25Score !== undefined
+        ? `, BM25: ${hybridResult.bm25Score.toFixed(2)}`
+        : '';
+
+    return `--- [Source #${sourceNum}: ${parts.join(' > ')}] (${relevance}% relevance${bm25Info}, ${methodLabel}) ---`;
   }
 
   /**
-   * Build citations from search results with document names
+   * Build citations from search results with enhanced metadata
    */
   private buildCitations(results: SearchResult[]): RagCitation[] {
-    return results.map((r) => ({
-      documentId: r.documentId,
-      documentName: r.documentName,
-      chunkIndex: r.chunkIndex,
-      snippet: r.content.slice(0, 500),
-      similarity: r.similarity,
-      metadata: r.metadata,
-    }));
+    return results.map((r) => {
+      const hybridResult = r as any; // Cast to access hybrid-specific fields
+      return {
+        documentId: r.documentId,
+        documentName: r.documentName,
+        chunkIndex: r.chunkIndex,
+        snippet: r.content.slice(0, 500),
+        similarity: r.similarity,
+        metadata: r.metadata,
+        // Enhanced citation fields
+        sectionPath: r.metadata?.sectionPath || r.metadata?.section,
+        hierarchyLevel: r.metadata?.hierarchyLevel,
+        bm25Score: hybridResult.bm25Score,
+        rerankScore: hybridResult.rerankScore || r.similarity,
+        retrievalMethod: hybridResult.retrievalMethod || 'vector',
+      };
+    });
   }
 
   /**
