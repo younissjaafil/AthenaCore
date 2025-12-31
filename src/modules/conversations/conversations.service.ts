@@ -433,35 +433,55 @@ export class ConversationsService {
           `RAG with guardrails: agent=${agent.id} outcome=${ragOutcome} results=${searchResult.results.length} tokens=${contextTokenCount}`,
         );
 
-        // If guardrail says IDK, return early with the IDK message
+        // Handle IDK outcomes based on reason and web search availability
         if (ragOutcome === 'idk' && ragConfig.ragEnableGuardrails) {
-          const idkMessage = this.vectorSearchService.getIdkMessage(ragConfig);
+          // If no documents exist (no_results), allow LLM to answer with general knowledge
+          // If documents exist but similarity is low, only allow if web search is enabled
+          const shouldReturnIdk = 
+            idkReason === 'low_similarity' && !useWebSearch;
+          
+          if (shouldReturnIdk) {
+            const idkMessage = this.vectorSearchService.getIdkMessage(ragConfig);
 
-          // Log the query if logging is enabled
-          if (agent.ragEnableLogging) {
-            await this.logRagQuery(
-              conversation,
-              userQuery,
-              ragConfig,
-              ragOutcome,
-              idkReason,
-              retrievalMs,
-              contextTokenCount,
-              citations,
+            // Log the query if logging is enabled
+            if (agent.ragEnableLogging) {
+              await this.logRagQuery(
+                conversation,
+                userQuery,
+                ragConfig,
+                ragOutcome,
+                idkReason,
+                retrievalMs,
+                contextTokenCount,
+                citations,
+              );
+            }
+
+            return {
+              content: idkMessage,
+              metadata: {
+                model: agent.model,
+                ragContext: false,
+                ragSources: ragSources.length > 0 ? ragSources : undefined,
+                ragOutcome,
+                ragIdkReason: idkReason,
+                tokensUsed: this.estimateTokens(idkMessage),
+              },
+            };
+          }
+          
+          // If IDK but we're continuing (no_results or web search enabled), clear RAG context
+          if (idkReason === 'no_results') {
+            ragContext = ''; // No documents, use general knowledge
+            this.logger.log(
+              `RAG guardrail triggered (no_results), allowing LLM to answer with general knowledge for query: "${userQuery}"`,
+            );
+          } else if (useWebSearch) {
+            ragContext = ''; // Clear RAG context, use web search instead
+            this.logger.log(
+              `RAG guardrail triggered (low_similarity) but web search enabled, continuing with web search for query: "${userQuery}"`,
             );
           }
-
-          return {
-            content: idkMessage,
-            metadata: {
-              model: agent.model,
-              ragContext: false,
-              ragSources: ragSources.length > 0 ? ragSources : undefined,
-              ragOutcome,
-              ragIdkReason: idkReason,
-              tokensUsed: this.estimateTokens(idkMessage),
-            },
-          };
         }
       } catch (error) {
         this.logger.warn(
