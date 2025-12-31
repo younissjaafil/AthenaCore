@@ -65,8 +65,16 @@ export class RagQueryLogService {
   ) {}
 
   async logQuery(params: LogQueryParams): Promise<RagQueryLog> {
-    const { userId, agentId, query, topK, stats, citations, guardrail, conversationId } =
-      params;
+    const {
+      userId,
+      agentId,
+      query,
+      topK,
+      stats,
+      citations,
+      guardrail,
+      conversationId,
+    } = params;
 
     const maxSimilarity = citations.length
       ? Math.max(...citations.map((c) => c.similarity))
@@ -130,10 +138,7 @@ export class RagQueryLogService {
     this.logger.log(`Feedback recorded: log=${id} feedback=${feedback}`);
   }
 
-  async getAgentAnalytics(
-    agentId: string,
-    days = 30,
-  ): Promise<AgentAnalytics> {
+  async getAgentAnalytics(agentId: string, days = 30): Promise<AgentAnalytics> {
     const since = new Date();
     since.setDate(since.getDate() - days);
 
@@ -184,7 +189,10 @@ export class RagQueryLogService {
         : 0;
 
     // Calculate total tokens and estimated cost
-    const totalTokens = logs.reduce((sum, l) => sum + (l.totalTokensApprox || 0), 0);
+    const totalTokens = logs.reduce(
+      (sum, l) => sum + (l.totalTokensApprox || 0),
+      0,
+    );
     // GPT-4o pricing: ~$2.50/1M input + $10/1M output tokens (avg ~$5/1M)
     // GPT-4o-mini: ~$0.15/1M input + $0.60/1M output tokens (avg ~$0.30/1M)
     // Using conservative estimate of $3/1M tokens for mixed usage
@@ -240,7 +248,9 @@ export class RagQueryLogService {
   async resetAnalytics(agentId: string): Promise<{ deletedCount: number }> {
     const result = await this.repo.delete({ agentId });
     const deletedCount = result.affected || 0;
-    this.logger.log(`Analytics reset for agent ${agentId}: ${deletedCount} logs deleted`);
+    this.logger.log(
+      `Analytics reset for agent ${agentId}: ${deletedCount} logs deleted`,
+    );
     return { deletedCount };
   }
 }

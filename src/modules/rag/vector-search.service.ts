@@ -5,7 +5,10 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { EmbeddingsRepository } from './repositories/embeddings.repository';
 import { EmbeddingsService } from './embeddings.service';
 import { RagCitation } from './entities/rag-query-log.entity';
-import { HybridSearchService, HybridSearchResult } from './hybrid-search.service';
+import {
+  HybridSearchService,
+  HybridSearchResult,
+} from './hybrid-search.service';
 import { RerankerService, RerankedResult } from './reranker.service';
 
 export interface SearchResult {

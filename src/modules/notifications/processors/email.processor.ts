@@ -18,7 +18,6 @@ export interface EmailJob {
   userId: string;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-call
 @Processor('email-queue')
 export class EmailProcessor extends WorkerHost {
   private readonly logger = new Logger(EmailProcessor.name);
@@ -28,7 +27,6 @@ export class EmailProcessor extends WorkerHost {
     @InjectRepository(Notification)
     private readonly notificationRepository: Repository<Notification>,
   ) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call
     super();
   }
 

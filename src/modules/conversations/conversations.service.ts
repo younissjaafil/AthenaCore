@@ -26,6 +26,7 @@ import { CreateConversationDto } from './dto/create-conversation.dto';
 import { SendMessageDto } from './dto/send-message.dto';
 import { ConversationResponseDto } from './dto/conversation-response.dto';
 import { MessageResponseDto } from './dto/message-response.dto';
+import { DuckDuckGoSearchService } from '../search/duckduckgo-search.service';
 
 @Injectable()
 export class ConversationsService {
@@ -39,6 +40,7 @@ export class ConversationsService {
     private readonly cacheService: ConversationCacheService,
     private readonly vectorSearchService: VectorSearchService,
     private readonly ragQueryLogService: RagQueryLogService,
+    private readonly duckDuckGoSearchService: DuckDuckGoSearchService,
     @InjectRepository(Agent)
     private readonly agentRepository: Repository<Agent>,
   ) {
@@ -135,10 +137,12 @@ export class ConversationsService {
 
     // Generate AI response with RAG
     const useRag = dto.useRag !== false; // Default to true
+    const useWebSearch = dto.useWebSearch === true; // Default to false
     const assistantResponse = await this.generateAIResponse(
       conversation,
       dto.content,
       useRag,
+      useWebSearch,
     );
 
     // Save assistant message
@@ -147,7 +151,7 @@ export class ConversationsService {
       role: MessageRole.ASSISTANT,
       content: assistantResponse.content,
       tokenCount: this.estimateTokens(assistantResponse.content),
-      metadata: assistantResponse.metadata,
+      metadata: assistantResponse.metadata as Record<string, any>,
     });
 
     // Update conversation message count
@@ -343,6 +347,7 @@ export class ConversationsService {
     conversation: Conversation,
     userQuery: string,
     useRag: boolean,
+    useWebSearch: boolean = false,
   ): Promise<{
     content: string;
     metadata: any;
@@ -355,6 +360,8 @@ export class ConversationsService {
     let retrievalMs = 0;
     let contextTokenCount = 0;
     let citations: any[] = [];
+    let webSearchContext = '';
+    let webSearchSources: any[] = [];
 
     // Build agent RAG config from entity fields
     const ragConfig: AgentRagConfig = {
@@ -368,26 +375,56 @@ export class ConversationsService {
       ragIdkMessage: agent.ragIdkMessage,
     };
 
+    // Get web search results if enabled
+    if (useWebSearch) {
+      try {
+        const webResults = await this.duckDuckGoSearchService.search(
+          userQuery,
+          5,
+        );
+        webSearchContext =
+          this.duckDuckGoSearchService.formatSearchResultsAsContext(webResults);
+
+        webSearchSources = webResults.map((result) => ({
+          title: result.title,
+          url: result.url,
+          snippet: result.snippet,
+        }));
+
+        this.logger.log(
+          `Web search for "${userQuery}" returned ${webResults.length} results`,
+        );
+      } catch (error: unknown) {
+        const errorMessage =
+          error instanceof Error ? error.message : 'Unknown error';
+        this.logger.warn(`Web search failed: ${errorMessage}`);
+      }
+    }
+
     // Get RAG context if enabled
     if (useRag) {
       try {
-        const searchResult = await this.vectorSearchService.searchWithGuardrails(
-          conversation.agentId,
-          userQuery,
-          ragConfig,
-        );
+        const searchResult =
+          await this.vectorSearchService.searchWithGuardrails(
+            conversation.agentId,
+            userQuery,
+            ragConfig,
+          );
 
         ragContext = searchResult.context;
         ragOutcome = searchResult.guardrail.outcome;
         idkReason = searchResult.guardrail.reason;
         retrievalMs = searchResult.retrievalMs;
         contextTokenCount = searchResult.contextTokenCount;
-        citations = searchResult.citations;
+        citations = (searchResult.citations || []) as any[];
 
         // Store source references with document names for frontend display
         ragSources = searchResult.results.map((result) => ({
           documentId: result.documentId,
-          documentName: result.documentName || result.metadata?.documentTitle || 'Document',
+          documentName:
+            result.documentName ||
+            (result.metadata as Record<string, any>)?.documentTitle ||
+            'Document',
           chunkIndex: result.chunkIndex,
           similarity: result.similarity,
         }));
@@ -398,8 +435,7 @@ export class ConversationsService {
 
         // If guardrail says IDK, return early with the IDK message
         if (ragOutcome === 'idk' && ragConfig.ragEnableGuardrails) {
-          const idkMessage =
-            this.vectorSearchService.getIdkMessage(ragConfig);
+          const idkMessage = this.vectorSearchService.getIdkMessage(ragConfig);
 
           // Log the query if logging is enabled
           if (agent.ragEnableLogging) {
@@ -441,7 +477,11 @@ export class ConversationsService {
     );
 
     // Build the prompt
-    const systemPrompt = this.buildSystemPrompt(agent, ragContext);
+    const systemPrompt = this.buildSystemPrompt(
+      agent,
+      ragContext,
+      webSearchContext,
+    );
     const messages: Array<{
       role: 'system' | 'user' | 'assistant';
       content: string;
@@ -510,6 +550,9 @@ export class ConversationsService {
         ragContext: useRag && ragSources.length > 0,
         ragSources: ragSources.length > 0 ? ragSources : undefined,
         ragOutcome: useRag ? ragOutcome : undefined,
+        webSearchEnabled: useWebSearch,
+        webSearchSources:
+          webSearchSources.length > 0 ? webSearchSources : undefined,
         tokensUsed: this.estimateTokens(systemPrompt + responseContent),
       },
     };
@@ -560,11 +603,19 @@ export class ConversationsService {
   }
 
   /**
-   * Build system prompt with RAG context - enhanced for better document utilization
+   * Build system prompt with RAG context and web search context
    */
-  private buildSystemPrompt(agent: Agent, ragContext: string): string {
+  private buildSystemPrompt(
+    agent: Agent,
+    ragContext: string,
+    webSearchContext: string = '',
+  ): string {
     let prompt =
       agent.systemPrompt || `You are ${agent.name}, a helpful AI assistant.`;
+
+    if (webSearchContext) {
+      prompt += webSearchContext;
+    }
 
     if (ragContext) {
       prompt += `

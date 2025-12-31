@@ -162,7 +162,8 @@ export class RagController {
   @Post('reprocess/:agentId')
   @ApiBearerAuth()
   @ApiOperation({
-    summary: 'Reprocess all documents for an agent with new chunking/embeddings',
+    summary:
+      'Reprocess all documents for an agent with new chunking/embeddings',
   })
   @ApiResponse({
     status: 200,
@@ -181,9 +182,8 @@ export class RagController {
     );
 
     // Get all documents for the agent
-    const { DocumentsRepository } = await import(
-      '../documents/repositories/documents.repository'
-    );
+    const { DocumentsRepository } =
+      await import('../documents/repositories/documents.repository');
     const documentsModule = await import('../documents/documents.module');
     // Note: In a real implementation, you'd inject DocumentsRepository properly
     // For now, we'll process documents one by one
@@ -215,9 +215,7 @@ export class RagController {
     @Param('documentId') documentId: string,
     @CurrentUser('sub') userId: string,
   ): Promise<{ message: string; chunksCreated: number }> {
-    this.logger.log(
-      `Reprocessing document ${documentId} by user ${userId}`,
-    );
+    this.logger.log(`Reprocessing document ${documentId} by user ${userId}`);
 
     // Delete existing embeddings
     await this.embeddingsService.deleteDocumentEmbeddings(documentId);

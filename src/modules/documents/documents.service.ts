@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-return */
+
 import {
   Injectable,
   BadRequestException,
@@ -102,7 +102,7 @@ export class DocumentsService {
       file.buffer,
       file.mimetype,
     );
-    
+
     // Verify the file was actually uploaded to S3
     const fileExists = await this.s3Service.fileExists(s3Key);
     if (!fileExists) {
@@ -113,7 +113,7 @@ export class DocumentsService {
         `File upload failed: file was not saved to storage. Please try again.`,
       );
     }
-    
+
     const s3Url = this.s3Service.getBlobUrl(s3Key);
 
     if (!isNew) {
@@ -262,7 +262,9 @@ export class DocumentsService {
     try {
       const document = await this.documentsRepository.findById(documentId);
       if (!document) {
-        this.logger.warn(`Document ${documentId} not found, skipping processing`);
+        this.logger.warn(
+          `Document ${documentId} not found, skipping processing`,
+        );
         return;
       }
 
@@ -315,20 +317,25 @@ export class DocumentsService {
       );
     } catch (error: any) {
       const document = await this.documentsRepository.findById(documentId);
-      const filename = document?.originalFilename || document?.filename || 'unknown';
-      
+      const filename =
+        document?.originalFilename || document?.filename || 'unknown';
+
       // Create a more descriptive error message
       let errorMessage = error.message || 'Unknown error occurred';
-      
+
       // Enhance error message with context
-      if (errorMessage.includes('not found') || errorMessage.includes('NotFound') || errorMessage.includes('NoSuchKey')) {
+      if (
+        errorMessage.includes('not found') ||
+        errorMessage.includes('NotFound') ||
+        errorMessage.includes('NoSuchKey')
+      ) {
         errorMessage = `File not found in storage: ${filename}. The file may not have been uploaded successfully to S3.`;
       } else if (errorMessage.includes('S3')) {
         errorMessage = `S3 storage error: ${errorMessage}`;
       } else {
         errorMessage = `Processing error: ${errorMessage}`;
       }
-      
+
       this.logger.error(
         `Document processing failed for ${documentId} (${filename}):`,
         error.stack || error,

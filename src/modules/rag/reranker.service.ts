@@ -19,8 +19,7 @@ export class RerankerService {
       'cohere') as 'cohere' | 'jina' | 'huggingface';
     this.apiKey = this.configService.get<string>('RERANK_API_KEY');
     this.model =
-      this.configService.get<string>('RERANK_MODEL') ||
-      'rerank-english-v3.0';
+      this.configService.get<string>('RERANK_MODEL') || 'rerank-english-v3.0';
     this.baseUrl = this.configService.get<string>('RERANK_BASE_URL');
   }
 
@@ -175,11 +174,9 @@ export class RerankerService {
       throw new Error('RERANK_API_KEY not configured for HuggingFace');
     }
 
-    const model =
-      this.model || 'cross-encoder/ms-marco-MiniLM-L-6-v2';
+    const model = this.model || 'cross-encoder/ms-marco-MiniLM-L-6-v2';
     const apiUrl =
-      this.baseUrl ||
-      `https://api-inference.huggingface.co/models/${model}`;
+      this.baseUrl || `https://api-inference.huggingface.co/models/${model}`;
 
     // HuggingFace cross-encoder expects pairs
     const pairs = results.map((r) => [query, r.content]);

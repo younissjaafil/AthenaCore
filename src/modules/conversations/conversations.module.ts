@@ -11,6 +11,7 @@ import { Agent } from '../agents/entities/agent.entity';
 import { RagModule } from '../rag/rag.module';
 import { UsersModule } from '../users/users.module';
 import { RedisModule } from '../../infrastructure/cache/redis.module';
+import { SearchModule } from '../search/search.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { RedisModule } from '../../infrastructure/cache/redis.module';
     RagModule,
     UsersModule,
     RedisModule,
+    SearchModule,
   ],
   controllers: [ConversationsController],
   providers: [

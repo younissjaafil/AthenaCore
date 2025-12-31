@@ -23,7 +23,9 @@ export class ResendService {
   constructor(private configService: ConfigService) {
     const apiKey = this.configService.get<string>('RESEND_API_KEY');
     if (!apiKey) {
-      this.logger.warn('RESEND_API_KEY is not configured; email sending disabled');
+      this.logger.warn(
+        'RESEND_API_KEY is not configured; email sending disabled',
+      );
       this.fromEmail =
         this.configService.get<string>('RESEND_FROM_EMAIL') ||
         'noreply@athena.ai';

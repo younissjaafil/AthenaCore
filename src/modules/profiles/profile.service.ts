@@ -358,7 +358,7 @@ export class ProfileService {
     );
 
     return {
-      profiles: profiles.filter((p) => p !== null) as ProfileResponseDto[],
+      profiles: profiles.filter((p) => p !== null),
       total,
     };
   }
@@ -389,7 +389,7 @@ export class ProfileService {
     );
 
     return {
-      profiles: profiles.filter((p) => p !== null) as ProfileResponseDto[],
+      profiles: profiles.filter((p) => p !== null),
       total,
     };
   }

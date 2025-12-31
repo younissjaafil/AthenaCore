@@ -134,21 +134,25 @@ export class S3Service {
       const errorCode = error.name || error.$metadata?.httpStatusCode;
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       const errorMessage = error.message || 'Unknown error';
-      
+
       // Provide more descriptive error messages
-      if (errorCode === 'NoSuchKey' || errorCode === 'NotFound' || errorCode === 404) {
+      if (
+        errorCode === 'NoSuchKey' ||
+        errorCode === 'NotFound' ||
+        errorCode === 404
+      ) {
         const notFoundError = new Error(
-          `File not found in S3: ${key} (bucket: ${this.bucketName})`
+          `File not found in S3: ${key} (bucket: ${this.bucketName})`,
         );
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+
         notFoundError.name = 'NotFound';
         this.logger.error(`S3 file not found: ${key}`, error);
         throw notFoundError;
       }
-      
+
       this.logger.error(`S3 get file failed for key ${key}:`, error);
       const enhancedError = new Error(
-        `Failed to retrieve file from S3: ${key}. ${errorMessage}`
+        `Failed to retrieve file from S3: ${key}. ${errorMessage}`,
       );
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       enhancedError.stack = error.stack;
@@ -257,14 +261,16 @@ export class S3Service {
 
     // Upload new blob
     await this.uploadFile(buffer, s3Key, mimeType);
-    
+
     // Verify the upload succeeded
     const verifyExists = await this.fileExists(s3Key);
     if (!verifyExists) {
       this.logger.error(`Upload reported success but file not found: ${s3Key}`);
-      throw new Error(`File upload verification failed: file not found in S3 after upload`);
+      throw new Error(
+        `File upload verification failed: file not found in S3 after upload`,
+      );
     }
-    
+
     this.logger.log(`New blob uploaded: ${s3Key}`);
     return { s3Key, contentHash, isNew: true };
   }

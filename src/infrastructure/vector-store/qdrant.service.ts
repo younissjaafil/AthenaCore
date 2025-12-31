@@ -30,21 +30,28 @@ export class QdrantService implements OnModuleInit {
     const qdrantApiKey = this.configService.get<string>('QDRANT_API_KEY');
 
     if (!qdrantUrl) {
-      this.logger.warn('QDRANT_URL not configured - vector search will be unavailable');
+      this.logger.warn(
+        'QDRANT_URL not configured - vector search will be unavailable',
+      );
       return;
     }
 
     // For Qdrant Cloud, remove port if present (Cloud uses standard HTTPS ports)
     // Format should be: https://<cluster-id>.<region>.cloud.qdrant.io
     let normalizedUrl = qdrantUrl.trim();
-    if (normalizedUrl.includes('.cloud.qdrant.io') && normalizedUrl.includes(':6333')) {
+    if (
+      normalizedUrl.includes('.cloud.qdrant.io') &&
+      normalizedUrl.includes(':6333')
+    ) {
       this.logger.warn(
         'Qdrant Cloud URL detected with port 6333 - removing port (Cloud uses standard HTTPS)',
       );
       normalizedUrl = normalizedUrl.replace(':6333', '');
     }
 
-    this.logger.log(`Connecting to Qdrant at: ${normalizedUrl.replace(/\/$/, '')}`);
+    this.logger.log(
+      `Connecting to Qdrant at: ${normalizedUrl.replace(/\/$/, '')}`,
+    );
 
     this.client = new QdrantClient({
       url: normalizedUrl,
@@ -54,10 +61,12 @@ export class QdrantService implements OnModuleInit {
 
   async onModuleInit() {
     if (!this.client) {
-      this.logger.warn('Qdrant client not initialized - skipping collection setup');
+      this.logger.warn(
+        'Qdrant client not initialized - skipping collection setup',
+      );
       return;
     }
-    
+
     try {
       await this.ensureCollection();
     } catch (error: any) {
@@ -129,9 +138,9 @@ export class QdrantService implements OnModuleInit {
       const status = error.status || error.$metadata?.httpStatusCode;
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       const errorUrl = error.url || 'unknown';
-      
+
       let errorMessage = `Failed to ensure collection: ${error.message}`;
-      
+
       if (status === 404) {
         errorMessage += `\n  - Qdrant endpoint returned 404 Not Found`;
         errorMessage += `\n  - URL: ${errorUrl}`;
@@ -144,7 +153,7 @@ export class QdrantService implements OnModuleInit {
         errorMessage += `\n  - Authentication failed (status ${status})`;
         errorMessage += `\n  - Please verify QDRANT_API_KEY is correct`;
       }
-      
+
       this.logger.error(errorMessage);
       throw error;
     }

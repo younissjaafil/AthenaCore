@@ -26,4 +26,14 @@ export class SendMessageDto {
   @IsOptional()
   @IsBoolean()
   useRag?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Whether to use web search (DuckDuckGo) for real-time information (default: false)',
+    example: false,
+    default: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  useWebSearch?: boolean;
 }

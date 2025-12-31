@@ -16,7 +16,6 @@ const redisEnabled = process.env.REDIS_ENABLED?.toLowerCase() !== 'false';
     TypeOrmModule.forFeature([Notification]),
     ...(redisEnabled
       ? [
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
           BullModule.registerQueue({
             name: 'email-queue',
           }),

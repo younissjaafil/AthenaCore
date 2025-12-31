@@ -26,7 +26,7 @@ export class SummaryService {
    */
   async generateSummary(chunkContent: string): Promise<string> {
     const tokenCount = this.encoder.encode(chunkContent).length;
-    
+
     // Skip summarization for small chunks
     if (tokenCount < this.minTokensForSummary) {
       return chunkContent; // Return original for small chunks
@@ -69,11 +69,15 @@ export class SummaryService {
    */
   async generateSummariesBatch(chunks: string[]): Promise<string[]> {
     const summaries: string[] = [];
-    
+
     // Filter chunks that need summarization
     const chunksToSummarize = chunks.map((content, idx) => {
       const tokenCount = this.encoder.encode(content).length;
-      return { content, idx, needsSummary: tokenCount >= this.minTokensForSummary };
+      return {
+        content,
+        idx,
+        needsSummary: tokenCount >= this.minTokensForSummary,
+      };
     });
 
     // Process in batches

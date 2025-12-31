@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument */
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -74,7 +74,7 @@ export class EmbeddingsRepository {
       .map((input) => {
         const rawVector = input.vector;
         const summaryVector = (input as any).summaryVector;
-        
+
         if (!rawVector && !summaryVector) return null;
 
         // Use named vectors if summary vector exists, otherwise use legacy single vector
@@ -87,7 +87,7 @@ export class EmbeddingsRepository {
         }
 
         return {
-          id: input.id as string,
+          id: input.id,
           vectors: Object.keys(vectors).length > 0 ? vectors : undefined,
           vector: !summaryVector ? rawVector : undefined, // Legacy fallback
           payload: {
