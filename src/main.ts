@@ -1,3 +1,7 @@
+// Polyfill Web APIs for Node.js compatibility with undici
+import { Blob, File } from 'buffer';
+Object.assign(globalThis, { Blob, File });
+
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -6,6 +10,7 @@ import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 // Updated: date_overrides FK constraint fixed - Dec 3, 2025
+// Fixed: Added Web API polyfill for undici compatibility - Dec 31, 2025
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
