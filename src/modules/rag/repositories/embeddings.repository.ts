@@ -77,7 +77,7 @@ export class EmbeddingsRepository {
 
         if (!rawVector && !summaryVector) return null;
 
-        // Use named vectors if summary vector exists, otherwise use legacy single vector
+        // Always use named vectors (collection is configured for named vectors)
         const vectors: any = {};
         if (rawVector) {
           vectors.raw = rawVector;
@@ -89,7 +89,6 @@ export class EmbeddingsRepository {
         return {
           id: input.id,
           vectors: Object.keys(vectors).length > 0 ? vectors : undefined,
-          vector: !summaryVector ? rawVector : undefined, // Legacy fallback
           payload: {
             agentId: input.agentId,
             documentId: input.documentId,
@@ -103,6 +102,23 @@ export class EmbeddingsRepository {
 
     if (vectorPoints.length > 0) {
       try {
+        // Log first vector point structure for debugging
+        if (vectorPoints.length > 0) {
+          const firstPoint = vectorPoints[0];
+          this.logger.log(
+            `Preparing to upsert ${vectorPoints.length} points. First point: ${JSON.stringify(
+              {
+                id: firstPoint.id,
+                hasVectors: !!firstPoint.vectors,
+                vectorsKeys: firstPoint.vectors
+                  ? Object.keys(firstPoint.vectors)
+                  : [],
+                payloadKeys: Object.keys(firstPoint.payload),
+              },
+            )}`,
+          );
+        }
+
         await this.qdrantService.upsertPoints(vectorPoints);
         this.logger.log(`Stored ${vectorPoints.length} vectors in Qdrant`);
       } catch (error) {

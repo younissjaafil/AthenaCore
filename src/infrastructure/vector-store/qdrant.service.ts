@@ -162,28 +162,57 @@ export class QdrantService implements OnModuleInit {
   async upsertPoints(points: VectorPoint[]): Promise<void> {
     this.ensureClient();
     try {
+      const qdrantPoints = points.map((p) => {
+        const point: any = {
+          id: p.id,
+          payload: p.payload,
+        };
+
+        // Use named vectors (collection is configured for named vectors)
+        if (p.vectors) {
+          point.vector = p.vectors;
+        } else if (p.vector) {
+          // Fallback: wrap single vector in 'raw' name
+          point.vector = { raw: p.vector };
+        } else {
+          this.logger.error(`Point ${p.id} has no vectors`);
+          throw new Error(`Point ${p.id} has no vectors`);
+        }
+
+        return point;
+      });
+
+      // Log first point structure for debugging
+      if (qdrantPoints.length > 0) {
+        const firstPoint = qdrantPoints[0];
+        this.logger.log(
+          `Upserting ${qdrantPoints.length} points. First point structure: ${JSON.stringify({
+            id: firstPoint.id,
+            hasVector: !!firstPoint.vector,
+            vectorKeys: firstPoint.vector ? Object.keys(firstPoint.vector) : [],
+            vectorTypes: firstPoint.vector
+              ? Object.entries(firstPoint.vector).map(([k, v]) => [
+                  k,
+                  Array.isArray(v) ? `array[${(v as any[]).length}]` : typeof v,
+                ])
+              : [],
+            payloadKeys: Object.keys(firstPoint.payload),
+          })}`,
+        );
+      }
+
       await this.client.upsert(this.collectionName, {
         wait: true,
-        points: points.map((p) => {
-          const point: any = {
-            id: p.id,
-            payload: p.payload,
-          };
-
-          // Support both named vectors (new) and single vector (legacy)
-          if (p.vectors) {
-            point.vector = p.vectors;
-          } else if (p.vector) {
-            // Legacy: use raw vector name
-            point.vector = { raw: p.vector };
-          }
-
-          return point;
-        }),
+        points: qdrantPoints,
       });
       this.logger.log(`Upserted ${points.length} points to Qdrant`);
     } catch (error: any) {
       this.logger.error(`Failed to upsert points: ${error.message}`);
+      if (error.response) {
+        this.logger.error(
+          `Qdrant response: ${JSON.stringify(error.response.data || error.response)}`,
+        );
+      }
       throw error;
     }
   }
