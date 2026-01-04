@@ -290,6 +290,33 @@ export class DocumentsService {
         document.fileType as DocumentType,
       );
 
+      // Validate extracted text
+      if (!extractedText || extractedText.trim().length === 0) {
+        const errorMessage = `No text could be extracted from ${document.originalFilename || document.filename}. The file may be empty, image-only, or in an unsupported format.`;
+        this.logger.error(errorMessage);
+        await this.documentsRepository.updateStatus(
+          documentId,
+          DocumentStatus.FAILED,
+          errorMessage,
+        );
+        return;
+      }
+
+      if (extractedText.trim().length < 10) {
+        const errorMessage = `Extracted text is too short (${extractedText.trim().length} characters). The file may not contain meaningful content.`;
+        this.logger.warn(errorMessage);
+        await this.documentsRepository.updateStatus(
+          documentId,
+          DocumentStatus.FAILED,
+          errorMessage,
+        );
+        return;
+      }
+
+      this.logger.log(
+        `Extracted ${extractedText.length} characters from ${document.originalFilename || document.filename}`,
+      );
+
       // Update document with extracted text
       await this.documentsRepository.update(documentId, {
         extractedText,

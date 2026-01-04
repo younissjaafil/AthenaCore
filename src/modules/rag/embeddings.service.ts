@@ -132,6 +132,16 @@ export class EmbeddingsService {
         });
     this.logger.log(`Created ${chunks.length} chunks from document`);
 
+    // Validate that we have chunks
+    if (chunks.length === 0) {
+      this.logger.error(
+        `No chunks created for document ${documentId}. Text length: ${document.extractedText.length}`,
+      );
+      throw new Error(
+        `Failed to create chunks from document. The document may have an unsupported format or structure.`,
+      );
+    }
+
     // Generate embeddings in batches
     await this.generateEmbeddingsForChunks(
       document.agentId,
@@ -320,6 +330,21 @@ export class EmbeddingsService {
       currentSection.endPos = position;
     }
 
+    // If no sections were found (no markdown headers), create a root section with all content
+    if (sections.length === 0 && currentContent.length > 0) {
+      const allContent = currentContent.join('\n').trim();
+      if (allContent) {
+        sections.push({
+          level: 0,
+          title: '',
+          content: allContent,
+          startPos: 0,
+          endPos: position,
+          children: [],
+        });
+      }
+    }
+
     return sections;
   }
 
@@ -336,6 +361,7 @@ export class EmbeddingsService {
     const sectionPath = this.buildSectionPath(section);
 
     // If section has a heading, create a heading chunk separately
+    let contentStartPosition = startPosition;
     if (section.title) {
       const headingLine = `#${'#'.repeat(section.level - 1)} ${section.title}`;
       const headingTokensOnly = this.encoder.encode(headingLine);
@@ -357,14 +383,16 @@ export class EmbeddingsService {
       };
       chunks.push(headingChunk);
       parentChunkMap.set(sectionPath, headingChunk.content);
+      contentStartPosition = startPosition + headingTokensOnly.length;
+    }
 
-      // Process content paragraphs separately (each paragraph = one chunk)
-      if (section.content.trim().length > 0) {
-        // Process content paragraphs - each paragraph becomes its own chunk
-        const paragraphs = this.splitIntoParagraphs(section.content);
-        let currentPos = startPosition + headingTokensOnly.length;
+    // Process content paragraphs separately (each paragraph = one chunk)
+    if (section.content.trim().length > 0) {
+      // Process content paragraphs - each paragraph becomes its own chunk
+      const paragraphs = this.splitIntoParagraphs(section.content);
+      let currentPos = contentStartPosition;
 
-        for (const paragraph of paragraphs) {
+      for (const paragraph of paragraphs) {
           const trimmedParagraph = paragraph.trim();
 
           // Skip empty paragraphs
@@ -424,9 +452,8 @@ export class EmbeddingsService {
               section: sectionPath,
             }),
           };
-          chunks.push(newChunk);
-          currentPos = newChunk.endPosition;
-        }
+        chunks.push(newChunk);
+        currentPos = newChunk.endPosition;
       }
     }
 
@@ -549,9 +576,42 @@ export class EmbeddingsService {
    * Split text into paragraphs, preserving headers
    */
   private splitIntoParagraphs(text: string): string[] {
-    // Split by double newlines, markdown headers, or HR markers
+    // First try: Split by double newlines, markdown headers, or HR markers
     const rawParagraphs = text.split(/\n\n+|(?=^#{1,6}\s)/m);
-    return rawParagraphs.map((p) => p.trim()).filter((p) => p.length > 0);
+    const paragraphs = rawParagraphs.map((p) => p.trim()).filter((p) => p.length > 0);
+    
+    // If we only got 1 paragraph and it's very long, the document likely doesn't have double newlines
+    // (common in PDFs). Fall back to splitting by single newlines and grouping into reasonable chunks.
+    if (paragraphs.length === 1 && paragraphs[0].length > 1000) {
+      this.logger.log('Document has no paragraph breaks, using sentence-based chunking');
+      // Split by single newlines and group lines into paragraphs of reasonable size
+      const lines = text.split(/\n/).map(l => l.trim()).filter(l => l.length > 0);
+      const groupedParagraphs: string[] = [];
+      let currentGroup: string[] = [];
+      let currentLength = 0;
+      const targetLength = 500; // Target ~500 chars per paragraph
+      
+      for (const line of lines) {
+        currentGroup.push(line);
+        currentLength += line.length;
+        
+        // Group lines until we reach target length, then start a new paragraph
+        if (currentLength >= targetLength) {
+          groupedParagraphs.push(currentGroup.join(' '));
+          currentGroup = [];
+          currentLength = 0;
+        }
+      }
+      
+      // Add remaining lines
+      if (currentGroup.length > 0) {
+        groupedParagraphs.push(currentGroup.join(' '));
+      }
+      
+      return groupedParagraphs.filter(p => p.length > 0);
+    }
+    
+    return paragraphs;
   }
 
   /**
