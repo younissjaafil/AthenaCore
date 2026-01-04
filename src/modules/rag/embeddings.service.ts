@@ -57,7 +57,7 @@ export class EmbeddingsService {
   private readonly minTokensPerChunk = 10; // Safety limit only (very low) - allow meaningful small chunks
   private readonly chunkOverlap = 50; // Minimal overlap (1-2 sentences) for context preservation
   private readonly hierarchicalChunkOverlap = 30; // Minimal overlap for hierarchical (1 sentence)
-  private readonly embeddingModel = 'text-embedding-3-large';
+  private readonly embeddingModel = 'text-embedding-3-small';
   private readonly enableHierarchicalChunking = true; // Feature flag
   private readonly enableMultiVector = true; // Feature flag for multi-vector embeddings
   // Chunking strategy: paragraph-based (one paragraph = one chunk, or group related paragraphs)

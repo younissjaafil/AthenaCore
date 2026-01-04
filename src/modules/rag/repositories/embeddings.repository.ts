@@ -73,22 +73,19 @@ export class EmbeddingsRepository {
     const vectorPoints = embeddingsWithIds
       .map((input) => {
         const rawVector = input.vector;
-        const summaryVector = (input as any).summaryVector;
+        // Note: summaryVector is stored in PostgreSQL but NOT sent to Qdrant
+        // (collection only supports 'raw' vector for now)
 
-        if (!rawVector && !summaryVector) return null;
+        if (!rawVector) return null;
 
-        // Always use named vectors (collection is configured for named vectors)
-        const vectors: any = {};
-        if (rawVector) {
-          vectors.raw = rawVector;
-        }
-        if (summaryVector) {
-          vectors.summary = summaryVector;
-        }
+        // Only send raw vector to Qdrant
+        const vectors: any = {
+          raw: rawVector,
+        };
 
         return {
           id: input.id,
-          vectors: Object.keys(vectors).length > 0 ? vectors : undefined,
+          vectors,
           payload: {
             agentId: input.agentId,
             documentId: input.documentId,

@@ -98,41 +98,53 @@ export class QdrantService implements OnModuleInit {
         (c) => c.name === this.collectionName,
       );
 
-      if (!exists) {
-        this.logger.log(`Creating collection: ${this.collectionName}`);
-        // Use named vectors for multi-vector support
-        await this.client.createCollection(this.collectionName, {
-          vectors: {
-            raw: {
-              size: this.vectorSize,
-              distance: 'Cosine',
-            },
-            summary: {
-              size: this.vectorSize,
-              distance: 'Cosine',
-            },
-          },
-          optimizers_config: {
-            default_segment_number: 2,
-          },
-          replication_factor: 1,
-        });
-
-        // Create payload indexes for efficient filtering
-        await this.client.createPayloadIndex(this.collectionName, {
-          field_name: 'agentId',
-          field_schema: 'keyword',
-        });
-
-        await this.client.createPayloadIndex(this.collectionName, {
-          field_name: 'documentId',
-          field_schema: 'keyword',
-        });
-
-        this.logger.log(`Collection ${this.collectionName} created`);
-      } else {
-        this.logger.log(`Collection ${this.collectionName} already exists`);
+      if (exists) {
+        // Check if existing collection has correct vector configuration
+        const collectionInfo = await this.client.getCollection(this.collectionName);
+        const rawVectorConfig = (collectionInfo.config?.params as any)?.vectors?.raw;
+        
+        if (rawVectorConfig && rawVectorConfig.size !== this.vectorSize) {
+          this.logger.warn(
+            `Collection ${this.collectionName} has incorrect vector size (${rawVectorConfig.size} vs expected ${this.vectorSize}). Recreating collection...`,
+          );
+          
+          // Delete existing collection
+          await this.client.deleteCollection(this.collectionName);
+          this.logger.log(`Deleted collection ${this.collectionName}`);
+          
+          // Create with correct configuration (fall through to creation logic below)
+        } else {
+          this.logger.log(`Collection ${this.collectionName} already exists with correct configuration`);
+          return;
+        }
       }
+
+      // Create collection (either first time or after deletion)
+      this.logger.log(`Creating collection: ${this.collectionName}`);
+      // Use single unnamed vector (simplest configuration)
+      await this.client.createCollection(this.collectionName, {
+        vectors: {
+          size: this.vectorSize,
+          distance: 'Cosine',
+        },
+        optimizers_config: {
+          default_segment_number: 2,
+        },
+        replication_factor: 1,
+      });
+
+      // Create payload indexes for efficient filtering
+      await this.client.createPayloadIndex(this.collectionName, {
+        field_name: 'agentId',
+        field_schema: 'keyword',
+      });
+
+      await this.client.createPayloadIndex(this.collectionName, {
+        field_name: 'documentId',
+        field_schema: 'keyword',
+      });
+
+      this.logger.log(`Collection ${this.collectionName} created successfully`);
     } catch (error: any) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       const status = error.status || error.$metadata?.httpStatusCode;
@@ -168,12 +180,13 @@ export class QdrantService implements OnModuleInit {
           payload: p.payload,
         };
 
-        // Use named vectors (collection is configured for named vectors)
-        if (p.vectors) {
-          point.vector = p.vectors;
+        // Use unnamed vector (simple array) - collection uses single vector config
+        if (p.vectors?.raw) {
+          // Extract raw vector from named vectors format
+          point.vector = p.vectors.raw;
         } else if (p.vector) {
-          // Fallback: wrap single vector in 'raw' name
-          point.vector = { raw: p.vector };
+          // Direct vector array
+          point.vector = p.vector;
         } else {
           this.logger.error(`Point ${p.id} has no vectors`);
           throw new Error(`Point ${p.id} has no vectors`);
@@ -189,13 +202,7 @@ export class QdrantService implements OnModuleInit {
           `Upserting ${qdrantPoints.length} points. First point structure: ${JSON.stringify({
             id: firstPoint.id,
             hasVector: !!firstPoint.vector,
-            vectorKeys: firstPoint.vector ? Object.keys(firstPoint.vector) : [],
-            vectorTypes: firstPoint.vector
-              ? Object.entries(firstPoint.vector).map(([k, v]) => [
-                  k,
-                  Array.isArray(v) ? `array[${(v as any[]).length}]` : typeof v,
-                ])
-              : [],
+            vectorLength: Array.isArray(firstPoint.vector) ? firstPoint.vector.length : 'not-array',
             payloadKeys: Object.keys(firstPoint.payload),
           })}`,
         );
@@ -208,6 +215,12 @@ export class QdrantService implements OnModuleInit {
       this.logger.log(`Upserted ${points.length} points to Qdrant`);
     } catch (error: any) {
       this.logger.error(`Failed to upsert points: ${error.message}`);
+      this.logger.error(`Error details: ${JSON.stringify({
+        status: error.status,
+        statusText: error.statusText,
+        data: error.data,
+        message: error.message,
+      })}`);
       if (error.response) {
         this.logger.error(
           `Qdrant response: ${JSON.stringify(error.response.data || error.response)}`,
@@ -226,11 +239,9 @@ export class QdrantService implements OnModuleInit {
   ): Promise<SearchResult[]> {
     this.ensureClient();
     try {
+      // Use unnamed vector for search (collection uses single vector config)
       const results = await this.client.search(this.collectionName, {
-        vector: {
-          name: vectorName,
-          vector: queryVector,
-        },
+        vector: queryVector,
         limit,
         score_threshold: scoreThreshold,
         filter: {
@@ -245,7 +256,7 @@ export class QdrantService implements OnModuleInit {
       });
 
       this.logger.log(
-        `Qdrant: Found ${results.length} vectors (threshold: ${scoreThreshold}, vector: ${vectorName})`,
+        `Qdrant: Found ${results.length} vectors (threshold: ${scoreThreshold})`,
       );
 
       return results.map((r) => ({
@@ -320,6 +331,19 @@ export class QdrantService implements OnModuleInit {
       this.logger.error(`Count failed: ${error.message}`);
       return 0;
     }
+  }
+
+  async recreateCollection(): Promise<void> {
+    this.ensureClient();
+    this.logger.warn('Manually recreating collection...');
+    try {
+      await this.client.deleteCollection(this.collectionName);
+      this.logger.log(`Deleted collection ${this.collectionName}`);
+    } catch (error: any) {
+      this.logger.warn(`Collection deletion failed (may not exist): ${error.message}`);
+    }
+    await this.ensureCollection();
+    this.logger.log('Collection recreated successfully');
   }
 
   async countByDocument(documentId: string): Promise<number> {
